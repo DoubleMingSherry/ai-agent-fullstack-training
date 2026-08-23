@@ -8,3 +8,4 @@
 | [1-4](./1-4/) | Prompt Engineering | 将 Prompt 设计为行为契约，覆盖 System Prompt、角色与行为约束、Few-shot、任务拆解、模板复用、Prompt 注入防护和版本管理。 |
 | [1-5](./1-5/) | Structured Output | 使用 JSON Schema、Pydantic 与模型原生 Structured Output 建立三层校验，设计纠错循环、失败降级和稳定的业务协议。 |
 | [1-6](./1-6/) | LLM Gateway | 使用 FastAPI、自有请求协议和 Provider Adapter 统一模型入口，集成流式转发、Prompt 模板、重试与 Fallback，以及 Token、Cost、Latency 调用追踪和验收。 |
+| [1-7](./1-7/) | 可部署、可治理的 LLM Gateway | 将网关原型升级为 OpenAI Compatible 服务，覆盖多模型路由、Streaming 与 Structured Output、Prompt 版本、重试与 Fallback、鉴权限流、调用观测、自动化测试和容器化部署。 |
