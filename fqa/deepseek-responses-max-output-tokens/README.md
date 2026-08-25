@@ -1,7 +1,35 @@
-# DeepSeek Responses API `max_output_tokens` 官方语义核查
+# DeepSeek Responses API `max_output_tokens` 问题与调查报告
 
 > 核查与实验日期：2026-08-25（Asia/Shanghai）
 > 资料范围：官方语义部分仅使用 DeepSeek 官方 API 文档、指南、模型页、更新日志和服务状态页；运行时部分分别使用 OpenAI Python SDK 与 Python 标准库 raw HTTP 调用 DeepSeek 官方 API。
+
+## 问题
+
+需要验证 DeepSeek 官方 Responses API 中 `max_output_tokens` 是否存在不生效或语义实现异常的问题，尤其关注 `Responses API + reasoning + web_search` 场景下，该参数能否限制整个 Response 的累计输出 token。
+
+学员使用 OpenAI Python SDK 请求：
+
+```python
+response = client.responses.create(
+    model="deepseek-v4-flash",
+    input="分析 RKLB 最新基本面和消息面",
+    tools=[{"type": "web_search"}],
+    max_output_tokens=4096,
+    reasoning={"effort": "high"},
+)
+```
+
+观察到：
+
+```text
+request.max_output_tokens = 4096
+usage.output_tokens = 6000
+usage.output_tokens_details.reasoning_tokens = 2862
+status = completed
+incomplete_details = null
+```
+
+核心疑问是 `max_output_tokens` 是否被忽略、是否漏算 reasoning tokens，或是否在服务端执行 `web_search` 后形成的多轮 reasoning / tool continuation 之间被重置。调查需要通过 reasoning on/off、web search on/off 四组 A/B，并用 raw HTTP 排除 SDK 序列化问题。
 
 ## 结论摘要
 
@@ -86,12 +114,12 @@ Response IDs（供 DeepSeek 支持侧检索）：SDK Case 1–4 分别为 `16bdc
 
 ## 最小复现与提交建议
 
-最小复现程序：[`course_code/week02/2-1/deepseek_max_output_tokens_mre.py`](../course_code/week02/2-1/deepseek_max_output_tokens_mre.py)。它只从 `DS_API_KEY` 读取密钥，不打印密钥，并记录 request、status、incomplete details、error、usage、每个 output item type、item 计数、visible token 近似值和 `exceeded`。
+最小复现程序：[`deepseek_max_output_tokens_mre.py`](./deepseek_max_output_tokens_mre.py)。它只从 `DS_API_KEY` 读取密钥，不打印密钥，并记录 request、status、incomplete details、error、usage、每个 output item type、item 计数、visible token 近似值和 `exceeded`。
 
 ```bash
 export DS_API_KEY='配置在本机环境中，不要写入代码或报告'
 python -m pip install 'openai>=1,<3'
-python course_code/week02/2-1/deepseek_max_output_tokens_mre.py --transport both --output results.jsonl
+python fqa/deepseek-responses-max-output-tokens/deepseek_max_output_tokens_mre.py --transport both --output results.jsonl
 ```
 
 建议提交给 DeepSeek 的标题：
