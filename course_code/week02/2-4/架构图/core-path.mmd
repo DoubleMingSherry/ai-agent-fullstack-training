@@ -1,0 +1,30 @@
+sequenceDiagram
+    autonumber
+    participant H as Harness
+    participant G as Governance
+    participant A as ApprovalStore
+    participant L as Resource Lock
+    participant T as Tool Handler
+    participant S as AuditSink
+
+    H->>G: invoke(ToolCall, ExecutionContext)
+    G->>G: 白名单、参数、权限校验
+    G->>G: 业务预检查
+
+    alt 高风险写操作
+        G->>A: consume(approval_id, tool, args, ctx)
+        A-->>G: 审批有效且未使用
+    end
+
+    alt 写操作且有 resource_key
+        G->>L: 获取 tenant_id:order_id 锁
+        G->>T: 超时范围内执行
+        T-->>G: 业务结果
+        G->>L: 释放锁
+    else 读操作或无资源键
+        G->>T: 执行，瞬态错误按策略重试
+        T-->>G: 业务结果
+    end
+
+    G->>S: 写入脱敏审计记录
+    G-->>H: ToolResult（安全内容）

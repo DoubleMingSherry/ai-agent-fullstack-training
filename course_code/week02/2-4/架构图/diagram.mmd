@@ -1,0 +1,76 @@
+flowchart TB
+    subgraph Harness[Harness 扩展点]
+        Call[ToolCall<br/>id · name · arguments]
+        Invoke[Governance.invoke]
+        Before[before_tool_call]
+        Execute[_execute]
+        After[after_tool_call]
+        Result[ToolResult]
+    end
+
+    subgraph Context[执行上下文]
+        Ctx[ExecutionContext<br/>trace · 用户 · 租户<br/>权限 · 白名单 · approval_id]
+    end
+
+    subgraph Governance[调用前治理]
+        Whitelist{工具存在且<br/>在本轮白名单？}
+        Validate{Pydantic 参数校验}
+        Permission{拥有所需权限？}
+        Precheck[业务预检查<br/>订单状态与可退金额]
+        Approval{高风险操作需审批？}
+        Consume[ApprovalStore.consume<br/>身份、工具、参数摘要、有效期]
+    end
+
+    subgraph Execution[受控执行]
+        Kind{读操作？}
+        Recover[_execute_with_recovery<br/>超时控制 · 退避重试]
+        Resource{存在资源键？}
+        Lock[订单维度 asyncio.Lock]
+        Handler[Tool handler<br/>get_order / create_refund]
+    end
+
+    subgraph Protection[横切保护]
+        Redact[redact<br/>敏感键与邮箱脱敏]
+        Audit[AuditSink<br/>可观测审计记录]
+    end
+
+    Denied[PolicyDenied<br/>策略拒绝]
+    Failed[失败结果<br/>超时或执行异常]
+
+    Call --> Invoke
+    Ctx --> Before
+    Invoke --> Before --> Whitelist
+    Whitelist -- 否 --> Denied --> Audit
+    Whitelist -- 是 --> Validate
+    Validate -- 失败 --> Denied
+    Validate -- 通过 --> Permission
+    Permission -- 否 --> Denied
+    Permission -- 是 --> Precheck
+    Precheck -- 拒绝 --> Denied
+    Precheck -- 通过 --> Approval
+    Approval -- 是 --> Consume
+    Consume -- 无效 --> Denied
+    Consume -- 有效 --> Execute
+    Approval -- 否 --> Execute
+    Execute --> Kind
+    Kind -- 是 --> Recover --> Handler
+    Kind -- 否 --> Resource
+    Resource -- 否 --> Recover
+    Resource -- 是 --> Lock --> Recover
+    Handler -- 成功内容 --> After
+    Handler -- 超时或异常 --> Failed --> After
+    After --> Redact --> Result
+    After --> Audit
+    Audit --> Result
+
+    classDef entry fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef policy fill:#FFF3E0,stroke:#EF6C00,color:#E65100
+    classDef execution fill:#E8F5E9,stroke:#2E7D32,color:#1B5E20
+    classDef protection fill:#F3E5F5,stroke:#7B1FA2,color:#4A148C
+    classDef error fill:#FFEBEE,stroke:#C62828,color:#B71C1C
+
+    class Call,Invoke,Before,After,Result,Ctx entry
+    class Whitelist,Validate,Permission,Precheck,Approval,Consume policy
+    class Execute,Kind,Recover,Resource,Lock,Handler execution
+    class Redact,Audit protection
+    class Denied,Failed error
