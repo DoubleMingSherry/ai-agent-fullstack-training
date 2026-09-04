@@ -1,3 +1,5 @@
+from validationIssue import validate_decision
+
 samples = {
     "invalid_json": '{"action": "finish"',
     "missing_field": '{"action": "finish", "query": null}',
@@ -11,4 +13,4 @@ samples = {
 
 for name, raw_output in samples.items():
     result = validate_decision(raw_output)
-    print(name, result.valid, result.issues)
+    print(f'name: {name}, valid: {result.valid}, issues: {result.issues}')

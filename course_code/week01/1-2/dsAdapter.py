@@ -1,5 +1,7 @@
 import json
+from typing import Any
 from openai import OpenAI
+from modelAdapter import ModelAdapter, ModelCapabilities, ModelRequest, ModelResult
 
 class DeepSeekChatAdapter(ModelAdapter):
     name = "deepseek-v4-flash-chat"

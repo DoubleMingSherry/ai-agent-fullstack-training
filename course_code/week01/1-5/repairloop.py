@@ -1,5 +1,7 @@
 from collections.abc import Callable
-
+from pydantic import BaseModel
+from fieldrule import AgentDecision
+from validationIssue import ValidationIssue, validate_decision
 
 ModelCall = Callable[
     [list[dict[str, str]], dict[str, object]],
