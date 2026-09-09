@@ -9,7 +9,7 @@
 遍历 chunk 流时打点:mark_first_event / mark_text_delta(首个非空 delta)/ mark_completed
 
 ## 需要修改
-- 新增单文件: C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\practice/2_ttft.py(单一 Python 类)
+- 新增单文件: practice/2_ttft.py(单一 Python 类)
 - 除以上外不改动任何代码
 
 ## 验收标准

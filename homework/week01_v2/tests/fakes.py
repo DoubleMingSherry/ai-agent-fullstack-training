@@ -1,8 +1,9 @@
 """FakeProvider — fully scripted offline provider for unit tests.
 
-It never touches the network.  Failure type, chunk count/content and invalid
-JSON are all configurable so every acceptance scenario (retry, fallback,
-streaming red lines, schema failures) can be scripted deterministically.
+It never touches the network.  Failure type, chunk count/content, invalid
+JSON and length-truncation (``truncated`` marker on result/done) are all
+configurable so every acceptance scenario (retry, fallback, streaming red
+lines, schema failures, truncation) can be scripted deterministically.
 """
 
 from __future__ import annotations
@@ -49,6 +50,8 @@ class FakeProvider(Provider):
         stream_plan: Optional[Sequence[PlanItem]] = None,
         complete_failures: Sequence[ProviderError] = (),
         stream_failures: Sequence[ProviderError] = (),
+        complete_truncated: bool = False,   # 模拟非流式“长度截断”停止信号
+        stream_truncated: bool = False,     # 模拟流式“长度截断”停止信号
     ) -> None:
         self.text = text
         self._usage_kwargs: Dict[str, int] = dict(
@@ -66,6 +69,8 @@ class FakeProvider(Provider):
 
         self.complete_failures: Deque[ProviderError] = deque(complete_failures)
         self.stream_failures: Deque[ProviderError] = deque(stream_failures)
+        self.complete_truncated = complete_truncated
+        self.stream_truncated = stream_truncated
         self.complete_calls = 0
         self.stream_opens = 0
         self.last_request: Optional[ProviderRequest] = None
@@ -79,7 +84,9 @@ class FakeProvider(Provider):
         self.last_request = request
         if self.complete_failures:
             raise self.complete_failures.popleft()
-        return ProviderResult(text=self.text, usage=self._usage())
+        return ProviderResult(
+            text=self.text, usage=self._usage(), truncated=self.complete_truncated
+        )
 
     def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderEvent]:
         return self._stream(request)
@@ -93,4 +100,4 @@ class FakeProvider(Provider):
             if isinstance(item, ProviderError):
                 raise item
             yield ProviderContent(delta=item)
-        yield ProviderDone(usage=self._usage())
+        yield ProviderDone(usage=self._usage(), truncated=self.stream_truncated)

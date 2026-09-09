@@ -101,8 +101,9 @@ pytest          # 全部离线用例全绿（无真实网络请求），见「�
 错误码本身即协议：`unknown_model`、`unknown_prompt_template`、
 `missing_prompt_variable`、`invalid_prompt_variable`、`schema_validation_failed`、
 `rate_limited`、`upstream_error`（未配置备用模型时上游失败）、
-`fallback_exhausted`（配置了备用模型但主备全部失败）、`internal_error`、
-`unknown_trace`、`invalid_request`。
+`fallback_exhausted`（配置了备用模型但主备全部失败）、
+`output_truncated`（结构化输出被长度截断，5xx）、`internal_error`、
+`unknown_trace`、`invalid_request`（含入站上下文超预算 400）。
 
 **TTFT 语义**：`ttft_ms` 只属于流式调用（执行开始 → 首个内容块）；
 `/chat` 非流式调用没有“首 Token”时刻，`ttft_ms` 如实返回 `None`
@@ -228,6 +229,23 @@ curl -s http://127.0.0.1:8000/chat -H "Content-Type: application/json" -d "{\"mo
 3. **无论主/备模型、无论哪个协议适配器，上层只依赖同一份请求/响应/错误协议** ——
    Trace 中的 `model_used` + `adapter` 是其唯一可观测证据
    （`tests/test_retry_fallback.py::test_acceptance6_retry_then_fallback_succeeds`）。
+
+## 截断感知与入站上下文预算守卫（追加特性）
+
+- **截断归一化（适配器内，红线不变）**：Responses 的 `status == "incomplete"` +
+  `incomplete_details.reason`（长度类）与 Messages 的 `stop_reason == "max_tokens"`
+  各自归一化成统一布尔 `truncated`，随 `ProviderResult` / `ProviderDone` 带出适配器。
+- **Trace 落账**：`CallTrace.truncated` 成功、失败（及 aborted）都如实记录。
+- **错误分类**：请求带 `json_schema` 且被长度截断 → `output_truncated`（502，
+  不再误报 `schema_validation_failed`），错误信息含三处方（缩短上下文 /
+  提高 max_tokens / 拆小任务）；无 `json_schema` 的截断**正常返回**，
+  `LLMResponse.truncated=True`。
+- **入站预算守卫**：字符数粗估 token（中文≈1 字/token，英文≈4 字符/token），
+  超出预算（`create_app(max_input_tokens=...)` 可注入，默认 200_000）在模板渲染
+  之后、限流/执行之前直接 `invalid_request`（400）拒绝，不占用配额。
+- 离线证据：`tests/test_truncation_and_budget.py`（`test_trace_truncated_true_on_error_and_false_on_normal`、
+  `test_structured_truncation_returns_output_truncated`、`test_plain_truncation_returns_normally`、
+  `test_context_budget_guard_rejects_oversized_input` 等）。
 
 ## 真实调用验证
 

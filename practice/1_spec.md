@@ -9,7 +9,7 @@
 - 输出每一步的执行结果，包括调用了哪个工具，输入输出分别是什么
 
 ## 需要修改
-- 增加一个单一的python类，目标路径：C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\practice\1_spec.py
+- 增加一个单一的python类，目标路径：practice\1_spec.py
 - 不要改动其他代码
 
 ## 验收标准

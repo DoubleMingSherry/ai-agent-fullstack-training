@@ -16,6 +16,7 @@ Layer responsibilities concentrated here:
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
 from dataclasses import dataclass, field as dc_field
@@ -41,6 +42,44 @@ async def _default_sleep(seconds: float) -> None:
     await asyncio.sleep(seconds)
 
 
+DEFAULT_MAX_INPUT_TOKENS = 200_000  # 入站上下文预算默认值（字符估算，可注入覆盖）
+
+#: output_truncated 错误信息：写明三个处方（缩短上下文 / 提高 max_tokens / 拆小任务）
+TRUNCATED_PRESCRIPTIONS = (
+    "model output was truncated by the upstream length/context limit; "
+    "prescriptions: 1) shorten the input context 2) raise max_tokens "
+    "3) split the task into smaller pieces（处方：缩短上下文 / 提高 max_tokens / 拆小任务）"
+)
+
+
+def truncated_error() -> GatewayError:
+    return GatewayError("output_truncated", TRUNCATED_PRESCRIPTIONS)
+
+
+def estimate_tokens(text: str) -> int:
+    """字符数 → token 粗估：中文≈1 字 1 token，英文≈4 字符 1 token。"""
+    if not text:
+        return 0
+    wide = sum(1 for ch in text if ord(ch) > 0x7F)
+    ascii_count = len(text) - wide
+    return wide + (ascii_count + 3) // 4
+
+
+def estimate_input_tokens(
+    system_prompt: Optional[str],
+    messages: List[ChatMessage],
+    json_schema: Optional[Dict[str, Any]],
+) -> int:
+    parts: List[str] = []
+    if system_prompt:
+        parts.append(system_prompt)
+    for message in messages:
+        parts.append(message.content)
+    if json_schema is not None:
+        parts.append(json.dumps(json_schema, ensure_ascii=False, sort_keys=True))
+    return sum(estimate_tokens(part) for part in parts)
+
+
 @dataclass
 class ExecContext:
     """Per-call state produced by governance, consumed by execution."""
@@ -57,6 +96,7 @@ class ExecContext:
     adapter: Optional[str] = None
     started_at: float = dc_field(default_factory=time.perf_counter)
     ttft_ms: Optional[float] = None
+    truncated: bool = False  # upstream 归一化截断标记（成功/失败都要落 Trace）
     trace: Optional[CallTrace] = None
 
     @property
@@ -75,6 +115,7 @@ class GatewayService:
         rate_limiter: RateLimiter,
         backoff_base: float = 1.0,
         max_retries: int = 3,
+        max_input_tokens: int = DEFAULT_MAX_INPUT_TOKENS,
         sleep: Optional[Callable[[float], Any]] = None,
     ) -> None:
         self.registry = registry
@@ -84,6 +125,7 @@ class GatewayService:
         self.rate_limiter = rate_limiter
         self.backoff_base = backoff_base
         self.max_retries = max_retries
+        self.max_input_tokens = max_input_tokens
         self._sleep = sleep or _default_sleep  # async fn: await self._sleep(seconds)
 
     # ------------------------------------------------------------------
@@ -123,6 +165,28 @@ class GatewayService:
             else:
                 chat_messages.append(message)
         system_prompt = "\n".join(sys_parts) if sys_parts else None
+
+        # ---- 入站上下文预算守卫（校验前置：未渲染完/变量缺失先于它，此后
+        #      预算拒绝发生在限流与执行层之前，也不占用配额）----
+        estimated = estimate_input_tokens(system_prompt, chat_messages, request.json_schema)
+        if estimated > self.max_input_tokens:
+            # 与限流拒绝同等的可观测性：接口层拒绝也记 Trace（attempts=0）
+            budget_ctx = ExecContext(
+                call_id=uuid.uuid4().hex,
+                caller_id=caller_id,
+                request=request,
+                chain=self.registry.fallback_chain(request.model),
+                started_at=started,
+            )
+            budget_error = GatewayError(
+                "invalid_request",
+                f"estimated input ~{estimated} tokens exceeds the configured "
+                f"context budget of {self.max_input_tokens} tokens; "
+                "please shorten the input context or split the request",
+                call_id=budget_ctx.call_id,
+            )
+            self._record_error(budget_ctx, budget_error, attempts=0)
+            raise budget_error
 
         # ---- capability check across the whole candidate chain ----------
         needed = frozenset({CAP_JSON_SCHEMA if request.json_schema is not None else CAP_TEXT})
@@ -186,6 +250,7 @@ class GatewayService:
         trace.adapter = ctx.adapter
         trace.attempts = ctx.attempts
         trace.status = "success"
+        trace.truncated = ctx.truncated
         trace.usage = _usage_dict(usage)
         trace.cost = spec_cost(spec, usage)
         trace.latency_ms = (time.perf_counter() - ctx.started_at) * 1000.0
@@ -203,6 +268,7 @@ class GatewayService:
         trace.adapter = ctx.adapter
         trace.attempts = ctx.attempts if attempts is None else attempts
         trace.status = "error"
+        trace.truncated = ctx.truncated
         trace.error_code = error.code
         trace.error_message = error.message
         trace.latency_ms = (time.perf_counter() - ctx.started_at) * 1000.0
@@ -234,7 +300,15 @@ class GatewayService:
         # 避免把 E2E 延迟贴上 TTFT 标签误导读者（协议允许 Optional）。
         text = provider_result.text
         usage = provider_result.usage
+        ctx.truncated = provider_result.truncated
         structured: Optional[Any] = None
+        if ctx.truncated and ctx.needs_json:
+            # 截断的结构化输出无法完成 Schema 校验：归因为 output_truncated，
+            # 而不是 schema_validation_failed
+            error = truncated_error()
+            error.call_id = ctx.call_id
+            self._record_error(ctx, error)
+            raise error
         if ctx.needs_json:
             # second-layer local validation, at most one repair round
             try:
@@ -253,6 +327,7 @@ class GatewayService:
             attempts=ctx.attempts,
             text=text,
             structured=structured,
+            truncated=ctx.truncated,
             usage=usage,
             cost=spec_cost(spec, usage),
             latency_ms=(time.perf_counter() - started) * 1000.0,
@@ -351,6 +426,7 @@ class GatewayService:
                                 }
                             elif isinstance(event, ProviderDone):
                                 _usage_event(event)
+                                ctx.truncated = ctx.truncated or event.truncated
                         if ctx.model_used is None:
                             ctx.model_used = candidate
                             ctx.adapter = provider.adapter_name
@@ -390,8 +466,17 @@ class GatewayService:
                 _finalize_error(gateway_error)
                 return
 
-            # ---- success path: second-layer validation, then content.done ----
+            # ---- success path: truncation first, then schema validation ----
             text = "".join(parts)
+            if ctx.truncated and ctx.needs_json:
+                # 结构化输出被长度截断：归因 output_truncated（非 schema 问题）
+                error = truncated_error()
+                yield {
+                    "event": "response.failed",
+                    "data": {"code": error.code, "message": error.message},
+                }
+                _finalize_error(error)
+                return
             structured: Optional[Any] = None
             if ctx.needs_json:
                 try:
@@ -414,6 +499,7 @@ class GatewayService:
                 attempts=ctx.attempts,
                 text=text,
                 structured=structured,
+                truncated=ctx.truncated,
                 usage=usage,
                 cost=spec_cost(spec, usage),
                 latency_ms=(time.perf_counter() - ctx.started_at) * 1000.0,
@@ -436,6 +522,7 @@ class GatewayService:
                 trace = ctx.trace
                 if trace is not None:  # aborted (e.g. client disconnect)
                     trace.status = "aborted"
+                    trace.truncated = ctx.truncated
                     trace.attempts = ctx.attempts
                     trace.latency_ms = (time.perf_counter() - ctx.started_at) * 1000.0
                     trace.finished_at_ms = trace.started_at_ms + trace.latency_ms

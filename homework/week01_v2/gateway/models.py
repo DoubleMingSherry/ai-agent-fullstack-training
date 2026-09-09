@@ -88,6 +88,7 @@ class LLMResponse(BaseModel):
     attempts: int                  # total upstream attempts (retries incl.)
     text: Optional[str] = None     # raw text answer
     structured: Optional[Any] = None  # schema-validated object (layer-2 pass)
+    truncated: bool = False        # upstream stopped by length/context limit
     usage: TokenUsage = Field(default_factory=TokenUsage)
     cost: float = 0.0              # price(model_used) x tokens
     latency_ms: float = 0.0        # execution start -> response completion

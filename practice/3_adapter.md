@@ -11,7 +11,7 @@
 - Encoder 需保证 1.中文 Unicode 往返不丢字； 2.换行符(\n 与 \r\n)在 payload 内部正确转义，不得破坏帧结构； 3.引号/反斜杠 不破坏 SSE 结构； 4.空字符串 delta 不漂移 seq； 5.大 Payload > 64 KB 单事件
 
 ## 需要修改
-- 新增单文件: C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\practice\3_adapter.py
+- 新增单文件: practice\3_adapter.py
 - Adapter 和 Encoder 必须是两个互相独立的定义
 - 除以上外不改动任何代码
 

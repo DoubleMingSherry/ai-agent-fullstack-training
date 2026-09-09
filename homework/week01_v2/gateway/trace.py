@@ -2,7 +2,8 @@
 
 Every call (success and failure) is recorded with: call_id, caller_id,
 requested model, model_used, adapter, attempts, status, error code, prompt
-name/version/hash, classified token usage, cost, latency_ms and ttft_ms.
+name/version/hash, classified token usage, cost, latency_ms, ttft_ms and the
+normalized ``truncated`` marker (upstream stopped by length/context limit).
 ``model_used`` is the model that actually served the request — the only
 observable evidence of invariant 3.
 """
@@ -28,6 +29,7 @@ class CallTrace:
     adapter: Optional[str] = None       # protocol adapter actually used
     attempts: int = 0                   # total upstream attempts (no limiter refusals)
     status: str = "pending"             # success | error | aborted
+    truncated: bool = False             # upstream stopped by length/context limit
     error_code: Optional[str] = None
     error_message: Optional[str] = None
     prompt_name: Optional[str] = None
@@ -49,6 +51,7 @@ class CallTrace:
             "adapter": self.adapter,
             "attempts": self.attempts,
             "status": self.status,
+            "truncated": self.truncated,
             "error_code": self.error_code,
             "error_message": self.error_message,
             "prompt": (

@@ -14,7 +14,7 @@
 - 同3_adapter 一样，采用模拟chunk流，不实际调用模型
 
 ## 需要修改
-- 新增单文件: C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\practice\4_cancel.py
+- 新增单文件: practice\4_cancel.py
 - 除以上外不改动任何代码
 
 ## 验收标准

@@ -74,7 +74,7 @@
 - 真实调用验证走独立脚本 `verify_real.py`：对两个真实模型各完成非流式、流式、结构化输出、模板引用调用，打印 Token 分类统计 / TTFT / Latency 证据；凭证只从环境变量读取，脚本内不得硬编码密钥
 
 ## 需要修改
-1. 在 C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\homework\week01_v2 目录下创建完成项目
+1. 在 homework\week01_v2 目录下创建完成项目
 2. 不要修改其他路径下的代码
 3. git diff 除 homework\week01_v2 路径下的新增文件外，无其他改动
 

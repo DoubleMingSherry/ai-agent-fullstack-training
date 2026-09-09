@@ -131,7 +131,10 @@ class MessagesApiAdapter(Provider):
             for block in blocks
             if getattr(block, "type", "") == "text"
         )
-        return ProviderResult(text=text, usage=self._usage_of(message))
+        # Normalize the Messages stop signal to one unified boolean:
+        # stop_reason == "max_tokens" -> truncated (only the boolean leaves).
+        truncated = str(getattr(message, "stop_reason", "") or "") == "max_tokens"
+        return ProviderResult(text=text, usage=self._usage_of(message), truncated=truncated)
 
     def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderEvent]:
         return self._stream(request)
@@ -141,6 +144,7 @@ class MessagesApiAdapter(Provider):
         try:
             stream = await client.messages.create(**self._build_payload(request, stream=True))
             usage = TokenUsage()
+            stop_reason: Optional[str] = None
             async for event in stream:
                 event_type = str(getattr(event, "type", ""))
                 if event_type == "message_start":
@@ -156,7 +160,10 @@ class MessagesApiAdapter(Provider):
                     partial = self._usage_of(getattr(event, "usage", None))
                     if partial.output_tokens:
                         usage.output_tokens = partial.output_tokens
-            yield ProviderDone(usage=usage)
+                    stop_reason = getattr(getattr(event, "delta", None), "stop_reason", None) or stop_reason
+            yield ProviderDone(
+                usage=usage, truncated=str(stop_reason or "") == "max_tokens"
+            )
         except ProviderError:
             raise
         except Exception as exc:  # noqa: BLE001

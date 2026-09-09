@@ -36,7 +36,7 @@ from .providers.messages_api import MessagesApiAdapter
 from .providers.responses_api import ResponsesApiAdapter
 from .ratelimit import RateLimiter
 from .registry import ModelRegistry, builtin_registry
-from .service import GatewayService
+from .service import DEFAULT_MAX_INPUT_TOKENS, GatewayService
 from .templates import TemplateRegistry, builtin_templates
 from .trace import TraceStore
 
@@ -60,6 +60,7 @@ def create_app(
     rate_limits: Optional[Mapping[str, int]] = None,
     backoff_base: float = 1.0,
     max_retries: int = 3,
+    max_input_tokens: Optional[int] = None,  # 入站上下文预算（字符估算），None=默认
     trace_store: Optional[TraceStore] = None,
     sleep: Optional[Any] = None,
 ) -> FastAPI:
@@ -75,6 +76,7 @@ def create_app(
         rate_limiter=RateLimiter(_quotas_from_registry(registry, rate_limits)),
         backoff_base=backoff_base,
         max_retries=max_retries,
+        max_input_tokens=max_input_tokens or DEFAULT_MAX_INPUT_TOKENS,
         sleep=sleep,
     )
 

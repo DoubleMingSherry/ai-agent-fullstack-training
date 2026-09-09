@@ -114,6 +114,26 @@ class ResponsesApiAdapter(Provider):
             ),
         )
 
+    _LENGTH_TRUNCATION_REASONS = frozenset(
+        {"max_output_tokens", "length", "context_length_exceeded", "tokens_limit_reached"}
+    )
+
+    @staticmethod
+    def _truncated_of(response: Any) -> bool:
+        """Normalize the Responses stop signal to one unified boolean.
+
+        ``response.status == "incomplete"`` + ``incomplete_details.reason`` in
+        the length-truncation family -> truncated.  Only the boolean leaves the
+        adapter (red line: the native response object never does).
+        """
+        if not response:
+            return False
+        if str(getattr(response, "status", "") or "") != "incomplete":
+            return False
+        details = getattr(response, "incomplete_details", None) or {}
+        reason = str(getattr(details, "reason", "") or "").lower()
+        return reason in ResponsesApiAdapter._LENGTH_TRUNCATION_REASONS
+
     # ------------------------------------------------------------------
     async def complete(self, request: ProviderRequest) -> ProviderResult:
         client = self._ensure_client()
@@ -122,7 +142,9 @@ class ResponsesApiAdapter(Provider):
         except Exception as exc:  # noqa: BLE001 - unified classification
             raise self._classify(exc) from exc
         text = str(getattr(response, "output_text", "") or "")
-        return ProviderResult(text=text, usage=self._usage_of(response))
+        return ProviderResult(
+            text=text, usage=self._usage_of(response), truncated=self._truncated_of(response)
+        )
 
     def stream(self, request: ProviderRequest) -> AsyncIterator[ProviderEvent]:
         return self._stream(request)
@@ -131,22 +153,26 @@ class ResponsesApiAdapter(Provider):
         client = self._ensure_client()
         try:
             stream = await client.responses.create(**self._build_payload(request, stream=True))
-            completed = False
+            done = False
             async for event in stream:
                 event_type = str(getattr(event, "type", ""))
                 if event_type == "response.output_text.delta":
                     delta = getattr(event, "delta", None)
                     if delta:
                         yield ProviderContent(delta=str(delta))
-                elif event_type == "response.completed":
-                    completed = True
-                    usage = self._usage_of(getattr(event, "response", None))
-                    yield ProviderDone(usage=usage)
+                elif event_type in ("response.completed", "response.incomplete"):
+                    # 截断时 Responses 以 status=incomplete + incomplete_details 结束
+                    done = True
+                    response = getattr(event, "response", None)
+                    yield ProviderDone(
+                        usage=self._usage_of(response),
+                        truncated=self._truncated_of(response),
+                    )
                 elif event_type == "response.failed":
                     raise ProviderError(
                         "responses upstream reported response.failed", retryable=False
                     )
-            if not completed:  # pragma: no cover - defensive
+            if not done:  # pragma: no cover - defensive
                 raise ProviderError("responses stream ended without completion", retryable=True)
         except ProviderError:
             raise

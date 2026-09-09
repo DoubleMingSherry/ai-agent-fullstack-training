@@ -33,6 +33,7 @@ def build_client(
     rate_limits: Optional[Dict[str, int]] = None,
     backoff_base: float = 0.0,  # acceptance: tests inject 0 backoff
     max_retries: int = 3,
+    max_input_tokens: Optional[int] = None,
     trace_store: Optional[TraceStore] = None,
 ) -> TestClient:
     pro = pro if pro is not None else FakeProvider(text="answer from pro")
@@ -42,6 +43,7 @@ def build_client(
         rate_limits=rate_limits,
         backoff_base=backoff_base,
         max_retries=max_retries,
+        max_input_tokens=max_input_tokens,
         trace_store=trace_store,
     )
     return TestClient(app)

@@ -4,13 +4,17 @@ The gateway consumes ONLY these unified types from an adapter:
 
 * ``ProviderRequest``  — model + system prompt + chat messages + optional
   business JSON schema + generation knobs
-* ``ProviderResult``   — ``str`` text + ``TokenUsage`` (non-streaming)
+* ``ProviderResult``   — ``str`` text + ``TokenUsage`` + ``truncated``
+  (non-streaming); ``truncated`` is the normalized length-truncation marker
 * ``ProviderEvent``    — streaming: ``ProviderContent`` (content delta) and
-  ``ProviderDone`` (final classified usage)
+  ``ProviderDone`` (final classified usage + ``truncated`` marker)
 
 RED LINES honoured here:
 * No vendor SDK object (completion/response/event) ever leaves an adapter;
-  everything else in the gateway is decoupled from vendor types.
+  everything else in the gateway is decoupled from vendor types.  Stop-reason
+  normalization (Responses ``status``/``incomplete_details`` and Messages
+  ``stop_reason == "max_tokens"``) happens INSIDE the adapter and only the
+  unified boolean ``truncated`` crosses the boundary.
 * Adapters map every vendor exception onto a unified ``ProviderError`` whose
   ``retryable`` flag is the execution-layer whitelist (connection error /
   timeout / upstream 429 only).  Everything else is fatal to that attempt.
@@ -42,6 +46,7 @@ class ProviderRequest(BaseModel):
 class ProviderResult:
     text: str
     usage: TokenUsage
+    truncated: bool = False  # normalized: stopped by length/context limit
 
 
 @dataclass
@@ -52,6 +57,7 @@ class ProviderContent:
 @dataclass
 class ProviderDone:
     usage: TokenUsage
+    truncated: bool = False  # normalized: stopped by length/context limit
 
 
 ProviderEvent = Union[ProviderContent, ProviderDone]

@@ -65,7 +65,7 @@
 - 验收 = `pytest` 全绿
 
 ## 需要修改
-1. 在 C:\baidunetdiskdownload\STUDY\Agent\repository\ai-agent-fullstack-training\homework\week01 目录下创建完成项目
+1. 在 homework\week01 目录下创建完成项目
 2. 不要修改其他路径下的代码
 3. git diff 除 homework\week01 路径下的新增文件外，无其他改动
 

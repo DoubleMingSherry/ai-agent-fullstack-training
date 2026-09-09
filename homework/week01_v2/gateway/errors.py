@@ -27,6 +27,7 @@ ERROR_HTTP_STATUS: dict[str, int] = {
     "missing_prompt_variable": 400,    # required template variable absent
     "invalid_prompt_variable": 400,    # variable too long / wrong type
     "schema_validation_failed": 422,   # egress validation could not be repaired
+    "output_truncated": 502,           # structured output cut by length/context limit
     "rate_limited": 429,               # per-model quota exceeded (window)
     "upstream_error": 502,             # provider failed and no fallback configured
     "fallback_exhausted": 502,         # fallback chain exhausted (backup also failed)
