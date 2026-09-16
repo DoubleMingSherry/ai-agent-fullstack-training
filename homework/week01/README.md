@@ -1,7 +1,7 @@
 # Mini LLM Gateway（week01 作业）
 
 统一入口访问不同模型的迷你网关，需求见 `my_gateway.md`。
-验收 = `pytest` 全绿，全程离线（无任何真实网络请求）。
+验收 = `pytest` 全绿，全程离线（无任何真实网络请求，含网络请求版本位于： homework/week01_v2）。
 
 ```bash
 pip install -r requirements.txt
