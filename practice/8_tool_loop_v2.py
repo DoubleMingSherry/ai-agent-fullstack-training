@@ -1,22 +1,23 @@
-"""8_tool_loop.py 
-手搓，把最小 Tool Loop 落地成一个订单助手，把 0009 的 authorize() 装进 Runtime：
-
-1.两个工具：get_order(order_id)（只读、低风险）与 
-  create_refund(order_id, amount, reason)（写、高风险、需批准）。
-  handler 用内存字典模拟；输入模型 extra="forbid" + strict=True，
-  order_id 带 pattern。
-2.Mini Runtime：invoke(call) 按 validate（Pydantic）→ authorize（三条红线，
-  ExecutionContext.permissions = {"order:read"}，无退款权限）→ execute 
-  → finalize 四站走；函数体零 arguments 读取（红线 2）。
-3.tool_call_id 全生命周期：成功、拒绝、校验失败都生成
-  ToolResultMessage(role="tool", tool_call_id=..., is_error=...) 回写，
-  一个调用只有一份权威结果。
-4.离线测试（FakeModel 脚本化）至少四条：正常读订单一轮结束；注入攻击
-  —— create_refund 的 arguments 里带 approved=true, role="admin"，
-  断言被 Pydantic forbid 或 authorize 拒绝、is_error=True 回写、
-  handler 计数器为 0（0009 的副作用断言继续用）；MAX_STEPS 耗尽抛错；
-  两个同名调用乱序返回结果不错配。
-5.配 KEY 的话用真实模型跑一轮（openai SDK 的 tools 参数 + DeepSeek 端点）。
+"""8_tool_loop_v2.py 
+1. 新增策略类（老师 2-2 的简版）：
+    @dataclass(frozen=True)
+    class RetryPolicy:
+        max_attempts: int
+        idempotent: bool
+        retryable_codes: frozenset
+2. ToolDefinition 加字段 retry: RetryPolicy。
+   GET_ORDER：幂等、max_attempts=2、retryable_codes={UPSTREAM_ERROR}；
+   CREATE_REFUND：非幂等、max_attempts=1。
+3. execute 的 handler 调用段改成 attempts 循环：
+   can_retry = error.retryable and tool.retry.idempotent 
+   and (error.code in tool.retry.retryable_codes) 
+   and attempt < max_attempts；
+   退避 sleep_fn(0.25 * 2 ** (attempt-1))，
+   sleep_fn 作为参数注入（测试传 no-op —— 你 gateway v2 的 backoff_base=0 注入同款）。
+4. 三发测试：
+   (a) 幂等工具handler抛一次UPSTREAM_ERROR再成功 → 最终success且handler_calls==2；
+   (b) 非幂等工具同样失败 → error 收口且 handler_calls==1；
+   (c) retryable_codes 白名单外的错误码，即使幂等也不重试。
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from time import perf_counter
+from time import perf_counter, sleep
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import ValidationError
@@ -38,6 +39,11 @@ try:
 except (AttributeError, OSError):
     pass
 
+@dataclass(frozen=True)
+class RetryPolicy:
+    max_attempts: int
+    idempotent: bool
+    retryable_codes: frozenset
 
 @dataclass(frozen=True)
 class ExecutionContext:
@@ -84,6 +90,7 @@ class ToolDefinition:
     permission: Permission
     risk: RiskLevel
     handler: ToolHandler
+    retry: RetryPolicy
 ##########  公开接口
     def to_model_tool(self) -> dict:
         return {
@@ -127,6 +134,12 @@ GET_ORDER = ToolDefinition(
     permission="order:read",
     risk="low",
     handler=get_order,
+   # 重试策略：幂等、max_attempts=2、retryable_codes={UPSTREAM_ERROR}
+    retry=RetryPolicy(
+        max_attempts=2,
+        idempotent=True,
+        retryable_codes=frozenset({"UPSTREAM_ERROR"}),
+    )
 )
 
 CREATE_REFUND = ToolDefinition(
@@ -139,6 +152,30 @@ CREATE_REFUND = ToolDefinition(
     permission="order:write",
     risk="high",
     handler=create_refund,
+    # 重试策略：非幂等、max_attempts=1
+    retry=RetryPolicy(
+        max_attempts=1,
+        idempotent=False,
+        retryable_codes=frozenset(), 
+        )   
+)
+
+IDEMPOTENT_CREATE_REFUND = ToolDefinition(
+    name="idempotent_refund",
+    description=(
+            "为指定订单创建退款。"
+            "只能为已支付的订单申请退款。"
+        ),
+    input_model=CreateRefundInput,
+    permission="order:write",
+    risk="high",
+    handler=create_refund,
+   # 重试策略：幂等、max_attempts=2、retryable_codes={}
+    retry=RetryPolicy(
+        max_attempts=2,
+        idempotent=True,
+        retryable_codes=frozenset(),
+    )
 )
 #=================== ToolDefinition end ========================
 
@@ -187,7 +224,6 @@ class DemoOrderService:
             raise ValueError("订单不存在")
         return record
         
-    
     def refund(
             self,
             order_id: str,
@@ -215,6 +251,8 @@ class DemoOrderService:
             global HANDLER_CALLS
             HANDLER_CALLS += 1
             return True
+
+    
 #=================== DemoOrderService end ========================
 
 # 统一表达错误的方式
@@ -347,8 +385,7 @@ class FakeModel:
         self.received.append([dict(m) for m in messages])
         return next(self._turns)
 
-
-def run_order_agent(user_text, runtime, ctx, model) -> str:
+def run_order_agent(user_text, runtime, ctx, model, sleep_fn=sleep) -> str:
     messages = [
         {"role": "system", "content": "你是订单助手，不得编造订单。"},
         {"role": "user", "content": user_text},
@@ -372,7 +409,7 @@ def run_order_agent(user_text, runtime, ctx, model) -> str:
             return turn.text or ""
 
         for call in turn.tool_calls:
-            result = runtime.execute(call, ctx)
+            result = runtime.execute(call, ctx, sleep_fn = sleep_fn)
             messages.append(result.to_model_message())
 
     raise RuntimeError("agent exceeded maximum steps")
@@ -485,6 +522,7 @@ class MiniToolRuntime:
         self,
         call: ToolCall,
         ctx: ExecutionContext,
+        sleep_fn = sleep,
     ) -> ToolResultMessage:
         started = perf_counter()
         tool = self._tools.get(call.name)
@@ -524,19 +562,33 @@ class MiniToolRuntime:
             ))
     
         # 3.execute 执行 handler
-        try:
-            output = tool.handler(args, ctx)
-            return self._finish_success(call, output)
-        except ValueError as exc:
-            return self._finish_error(call, ctx, started, ToolError(
-                code="BUSINESS_ERROR",
-                message=str(exc),
-            ))
-        except Exception:
-            return self._finish_error(call, ctx, started, ToolError(
-                code="UPSTREAM_ERROR",
-                message="工具执行失败",
-            ))
+        retry_policy = tool.retry
+        for attempt in range(1, retry_policy.max_attempts + 1):
+            try:
+                output = tool.handler(args, ctx)
+                return self._finish_success(call, output)
+            except ValueError as exc:
+                error = ToolError(
+                    code="BUSINESS_ERROR",
+                    message=str(exc),
+                )
+            except Exception:
+                error = ToolError(
+                    code="UPSTREAM_ERROR",
+                    message="工具执行失败",
+                    retryable=True,
+                )
+
+            # 检查是否可以重试
+            can_retry = error.retryable and retry_policy.idempotent and error.code in retry_policy.retryable_codes and attempt < retry_policy.max_attempts
+            if not can_retry:
+                return self._finish_error(call, ctx, started, error)
+            # 退避
+            sleep_time = 0.25 * 2 ** (attempt - 1)
+            print(f"Runtime: id={call.id}, name={call.name}, attempt={attempt}, error={error}, retrying after {sleep_time:.2f}s")
+            sleep_fn(sleep_time)
+            
+                  
 
 def test_normal_read_order() -> None:
     runtime = MiniToolRuntime()
@@ -612,11 +664,153 @@ def test_disorder_tool_call_id() -> None:
     assert result1.tool_call_id == "t4_a"
     print("  ✓ test4 同轮多调用乱序返回结果配对正确")
 
+#=================== DemoRetryOrderService start =========================
+class DemoRetryOrderService(DemoOrderService):
+    def __init__(self, fail_first=True):
+        super().__init__()
+        self.calls = 0
+        self.fail_first = fail_first
+
+    def search(self, order_id, user_id):
+        self.calls += 1
+        if self.fail_first:
+            self.fail_first = False # 恢复False，避免第二次进入后还抛异常
+            raise RuntimeError("模拟上游错误")
+        return super().search(order_id, user_id)
+
+    def refund(self, order_id, amount_cents, reason, user_id):
+        self.calls += 1
+        if self.fail_first:
+            self.fail_first = False # 恢复False，避免第二次进入后还抛异常
+            raise RuntimeError("模拟上游错误")
+        return super().refund(order_id, amount_cents, reason, user_id)
+#=================== DemoRetryOrderService end ========================
+
+
+def test_idempotent_retry_success() -> None:
+    runtime = MiniToolRuntime()
+    runtime.register(GET_ORDER)
+    order_service = DemoRetryOrderService()
+    ctx = ExecutionContext(
+        user_id="user_demo",
+        permissions=frozenset({"order:read"}),
+        approved_actions=frozenset(),
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t5_c1", name="get_order", arguments_json='{"order_id": "ord_1001"}'),
+        )),
+        AssistantTurn(text="订单 ord_1001 状态 pending。", tool_calls=()),
+    ])
+
+
+    sleeps = []
+    answer = run_order_agent("查一下 ord_1001", runtime, ctx, model, sleep_fn=lambda s: sleeps.append(s))
+    assert answer == "订单 ord_1001 状态 pending。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t5_c1"
+    assert order_service.calls== 2, f"幂等工具重试次数不对，实际={order_service.calls}"
+    
+    assert sleeps == [0.25]
+    assert json.loads(round[3]["content"]).get("error")==None
+    assert json.loads(round[3]["content"])["status"]=="pending"
+    print("  ✓ test5 幂等工具重试成功断言通过：两轮结束、assistant-first 回写、id 配对正确、幂等工具重试次数正确、退避时间正确")
+
+def test_non_idempotent_retry_failure() -> None:
+    runtime = MiniToolRuntime()
+    runtime.register(CREATE_REFUND)
+    order_service = DemoRetryOrderService()
+    ctx = ExecutionContext(
+        user_id="user_demo",
+        permissions=frozenset({"order:read", "order:write"}),
+        approved_actions=frozenset({"create_refund"}),
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t6_c1", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'),
+        )),
+        AssistantTurn(text="退款失败，请稍后再试。", tool_calls=()),
+    ])
+    answer = run_order_agent("为 ord_1003 创建退款", runtime, ctx, model)
+    assert answer == "退款失败，请稍后再试。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t6_c1"
+    assert order_service.calls == 1, f"非幂等工具重试次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "UPSTREAM_ERROR"
+    print("  ✓ test6 非幂等工具重试失败断言通过：两轮结束、assistant-first 回写、id 配对正确、非幂等工具未重试 正确")
+
+
+def test_idempotent_disretryable_codes() -> None:
+    runtime = MiniToolRuntime()
+    runtime.register(GET_ORDER)
+    order_service = DemoRetryOrderService(fail_first=False)
+    ctx = ExecutionContext(
+        user_id="user_demo",
+        permissions=frozenset({"order:read"}),
+        approved_actions=frozenset(),
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t7_c1", name="get_order", arguments_json='{"order_id": "ord_9999"}'),
+        )),
+        AssistantTurn(text="订单 ord_9999 不存在。", tool_calls=()),
+    ])
+
+    answer = run_order_agent("查一下 ord_9999", runtime, ctx, model)
+    assert answer == "订单 ord_9999 不存在。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t7_c1"
+    assert order_service.calls == 1, f"幂等工具非重试码调用次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "BUSINESS_ERROR"
+    print("  ✓ test7 幂等工具非重试码断言通过：两轮结束、assistant-first 回写、id 配对正确、幂等工具非重试码不重试 正确")
+
+
+def test_idempotent_retryable_codes_nowhitelist() -> None:
+    runtime = MiniToolRuntime()
+    runtime.register(IDEMPOTENT_CREATE_REFUND)
+    order_service = DemoRetryOrderService()
+    ctx = ExecutionContext(
+        user_id="user_demo",
+        permissions=frozenset({"order:read", "order:write"}),
+        approved_actions=frozenset({"idempotent_refund"}),
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t8_c1", name="idempotent_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'),
+        )),
+        AssistantTurn(text="订单 ord_1003 异常。", tool_calls=()),
+    ])
+
+    answer = run_order_agent("将 ord_1003 退款", runtime, ctx, model)
+    assert answer == "订单 ord_1003 异常。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t8_c1"
+    assert order_service.calls == 1, f"幂等工具重试码非白名单调用次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "UPSTREAM_ERROR"
+    print("  ✓ test8 幂等工具重试码非白名单断言通过：两轮结束、assistant-first 回写、id 配对正确、幂等工具重试码非白名单不重试 正确")
+
+
 def run_offline_tests() -> None:
     print("== 离线测试 start ==")
     test_normal_read_order()
     test_beyond_max_steps()
     test_disorder_tool_call_id()
+    test_idempotent_retry_success()
+    test_non_idempotent_retry_failure()
+    test_idempotent_disretryable_codes()
+    test_idempotent_retryable_codes_nowhitelist()
     print("== 离线测试 end ==")
 
 def main() -> None:
