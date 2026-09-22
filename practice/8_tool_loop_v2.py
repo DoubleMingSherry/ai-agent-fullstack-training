@@ -390,8 +390,9 @@ def run_order_agent(user_text, runtime, ctx, model, sleep_fn=sleep) -> str:
         {"role": "system", "content": "你是订单助手，不得编造订单。"},
         {"role": "user", "content": user_text},
     ]
+    tools = runtime.model_tools(ctx)
     for step in range(1, MAX_STEPS + 1):
-        turn = model.chat(messages, runtime.model_tools(ctx))
+        turn = model.chat(messages, tools)
 
         # assistant-first writeback:先回写 assistant 消息(带 tool_calls)
         assistant_msg = {"role": "assistant"}

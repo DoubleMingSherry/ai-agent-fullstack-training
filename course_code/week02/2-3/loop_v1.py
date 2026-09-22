@@ -5,8 +5,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any
 
-from mcp import Client, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp_client_v1 import Client, StdioServerParameters,stdio_client
 from openai import AsyncOpenAI
 
 from mcp_client_v1 import base_dir, result_payload
