@@ -4,3 +4,6 @@ docs/
 
 __pycache__/
 .pytest_cache/
+/docs/
+node_modules/
+dist/
