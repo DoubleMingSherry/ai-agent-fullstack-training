@@ -21,12 +21,14 @@
 """
 from __future__ import annotations
 
+from base64 import encode
 from collections.abc import Callable
+from hashlib import sha256
 import json
 import os
 import sys
 from dataclasses import dataclass
-from time import perf_counter, sleep
+from time import monotonic, perf_counter, sleep
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_core import ValidationError
@@ -49,8 +51,9 @@ class RetryPolicy:
 class ExecutionContext:
     user_id: str
     permissions: frozenset
-    approved_actions: frozenset
     order_service: DemoOrderService | None = None
+    tenant_id: str | None = None
+    approval_id: str | None = None
 
 # 验收模型的参数是否符合要求
 class GetOrderInput(BaseModel):
@@ -73,8 +76,14 @@ class CreateRefundInput(BaseModel):
 
     order_id: str = Field(..., pattern=r"^[a-zA-Z0-9_]{3,20}$")
     amount_cents: int | None
-    reason: str | None
+    reason: str = "未填写退款原因"
 
+@dataclass(frozen=True)
+class ToolPolicy:
+    effect: Literal["READ", "WRITE"]
+    risk: Literal["low", "medium", "high"]
+    permission: str
+    requires_approval: bool
 
 # HANDLER_CALLS 全局计数。用于断言副作用：非法调用不执行 handler
 HANDLER_CALLS = 0
@@ -87,8 +96,7 @@ class ToolDefinition:
     description: str
     input_model: type # model_json_schema()  -> Schema  # 校验参数对不对
 ####### Runtime
-    permission: Permission
-    risk: RiskLevel
+    policy: ToolPolicy
     handler: ToolHandler
     retry: RetryPolicy
 ##########  公开接口
@@ -124,6 +132,17 @@ def create_refund(
     )
     return success
 
+def non_idempotent_query(
+    args: GetOrderInput,
+    ctx: ExecutionContext,
+) -> dict:
+    row = ctx.order_service.non_idempotent_query(
+        order_id=args.order_id,
+        user_id=ctx.user_id
+    )
+    return row
+
+
 GET_ORDER = ToolDefinition(
     name="get_order",
     description=(
@@ -131,8 +150,12 @@ GET_ORDER = ToolDefinition(
         "只读取订单；不能取消、退款或修改订单。"
     ),
     input_model=GetOrderInput,
-    permission="order:read",
-    risk="low",
+    policy=ToolPolicy(
+        effect="READ",
+        risk="low",
+        permission="order:read",
+        requires_approval=False
+    ),
     handler=get_order,
    # 重试策略：幂等、max_attempts=2、retryable_codes={UPSTREAM_ERROR}
     retry=RetryPolicy(
@@ -142,6 +165,50 @@ GET_ORDER = ToolDefinition(
     )
 )
 
+NON_IDEMPOTENT_QUERY = ToolDefinition(
+    name="non_idempotent_query",
+    description=(
+        "根据订单 ID 获取订单详情。"
+        "只读取订单；不能取消、退款或修改订单。"
+    ),
+    input_model=GetOrderInput,
+    policy=ToolPolicy(
+        effect="READ",
+        risk="medium",
+        permission="order:read",
+        requires_approval=False
+    ),
+    handler=non_idempotent_query,
+    # 重试策略：非幂等、max_attempts=1
+    retry=RetryPolicy(
+        max_attempts=2,
+        idempotent=False,
+        retryable_codes=frozenset({"UPSTREAM_ERROR"}), 
+        )   
+)
+
+MEDIUM_RISK_APPROVAL_QUERY = ToolDefinition(
+    name="medium_risk_approval_query",
+    description=(
+        "根据订单 ID 获取订单详情。"
+        "只读取订单；不能取消、退款或修改订单。"
+    ),
+    input_model=GetOrderInput,
+    policy=ToolPolicy(
+        effect="READ",
+        risk="medium",
+        permission="order:read",
+        requires_approval=True
+    ),
+    handler=non_idempotent_query,
+    # 重试策略：非幂等、max_attempts=1
+    retry=RetryPolicy(
+        max_attempts=2,
+        idempotent=False,
+        retryable_codes=frozenset({"UPSTREAM_ERROR"}), 
+        )   
+)
+
 CREATE_REFUND = ToolDefinition(
     name="create_refund",
     description=(
@@ -149,8 +216,12 @@ CREATE_REFUND = ToolDefinition(
         "只能为已支付的订单申请退款。"
     ),
     input_model=CreateRefundInput,
-    permission="order:write",
-    risk="high",
+    policy=ToolPolicy(
+        effect="WRITE",
+        risk="high",
+        permission="order:write",
+        requires_approval=True
+    ),
     handler=create_refund,
     # 重试策略：非幂等、max_attempts=1
     retry=RetryPolicy(
@@ -167,8 +238,12 @@ IDEMPOTENT_CREATE_REFUND = ToolDefinition(
             "只能为已支付的订单申请退款。"
         ),
     input_model=CreateRefundInput,
-    permission="order:write",
-    risk="high",
+    policy=ToolPolicy(
+        effect="WRITE",
+        risk="high",
+        permission="order:write",
+        requires_approval=True
+    ),
     handler=create_refund,
    # 重试策略：幂等、max_attempts=2、retryable_codes={}
     retry=RetryPolicy(
@@ -176,6 +251,28 @@ IDEMPOTENT_CREATE_REFUND = ToolDefinition(
         idempotent=True,
         retryable_codes=frozenset(),
     )
+)
+
+RETRYABLE_CREATE_REFUND = ToolDefinition(
+    name="retryable_create_refund",
+    description=(
+        "为指定订单创建退款。"
+        "只能为已支付的订单申请退款。"
+    ),
+    input_model=CreateRefundInput,
+    policy=ToolPolicy(
+        effect="WRITE",
+        risk="high",
+        permission="order:write",
+        requires_approval=True
+    ),
+    handler=create_refund,
+    # 重试策略：非幂等、max_attempts=2
+    retry=RetryPolicy(
+        max_attempts=2,
+        idempotent=False,
+        retryable_codes=frozenset({"TIMEOUT"}), 
+        )   
 )
 #=================== ToolDefinition end ========================
 
@@ -267,6 +364,7 @@ class ToolError(BaseModel):
         "BUSINESS_ERROR",    # 业务工具执行失败（如订单不存在、退款金额超限等）
         "INVALID_OUTPUT", # 业务工具违反的预先定义的返回协议
         "UPSTREAM_ERROR", # 业务工具执行失败
+        "TIMEOUT",        # 业务工具执行超时
     ]
     message: str
     retryable: bool = False
@@ -289,7 +387,7 @@ def run_side_effect_suite() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),   # 对订单仅有只读权限
-        approved_actions=frozenset(),            # 没有任何已批准的高风险动作
+        # approved_actions=frozenset(),            # 没有任何已批准的高风险动作
         order_service=DemoOrderService()
     )
     toolCalls = [
@@ -306,7 +404,7 @@ def run_side_effect_suite() -> None:
     perm_ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read", "order:write"}),   # 对订单有读写权限
-        approved_actions=frozenset(),            # 没有任何已批准的高风险动作
+        # approved_actions=frozenset(),            # 没有任何已批准的高风险动作
         order_service=DemoOrderService()
     )
     runtime.execute(ToolCall(id="call_id_4", name="create_refund", arguments_json='{"order_id": "ord_1002", "amount_cents": 100, "reason": "customer_request"}'), perm_ctx)
@@ -314,14 +412,47 @@ def run_side_effect_suite() -> None:
     assert HANDLER_CALLS == 0, f"副作用断言失败：非法动作执行了 {HANDLER_CALLS} 次"
     print(f"  ✓ 副作用断言通过：{len(toolCalls)} 个攻击输入，非法工具调用 0 次")
 
+
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(CREATE_REFUND)
+    runtime.register(GET_ORDER)
+    
     legit_ctx = ExecutionContext(
         user_id="user_demo", 
+        approval_id=None,
         permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
-        approved_actions=frozenset({"create_refund"}),  # 已批准 create_refund
         order_service=DemoOrderService())
+
+    
     result1 = runtime.execute(ToolCall(id="call_id_5", name="get_order", arguments_json='{"order_id": "ord_1001"}'), legit_ctx)
-    result2 = runtime.execute(ToolCall(id="call_id_6", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'), legit_ctx)
-    result3 = runtime.execute(ToolCall(id="call_id_7", name="create_refund", arguments_json='{"order_id": "ord_1002", "amount_cents": 100, "reason": "customer_request"}'), legit_ctx)
+
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"})
+
+    legit_ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=DemoOrderService())
+    
+    result2 = runtime.execute(ToolCall(id="call_id_6", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"}'), legit_ctx)
+
+    store.approve("appr_2",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1002", "amount_cents": 100, "reason": "质量问题"})
+
+    legit_ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_2",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=DemoOrderService())
+    
+    result3 = runtime.execute(ToolCall(id="call_id_7", name="create_refund", arguments_json='{"order_id": "ord_1002", "amount_cents": 100, "reason": "质量问题"}'), legit_ctx)
     assert result1.is_error is False and json.loads(result1.content)["order_id"] == "ord_1001"
     print("  ✓ 正例断言通过：合法动作 1/2 放行")
     assert result2.is_error is False and json.loads(result2.content) is True
@@ -432,7 +563,7 @@ def run_real() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset({"create_refund"}),
+        # approved_actions=frozenset({"create_refund"}),
         order_service=DemoOrderService(),
     )
     answer = run_order_agent(
@@ -473,9 +604,121 @@ def success_message(
         is_error=False,
     )
 
+@dataclass(frozen=True)
+class Decision:
+    action: Literal["allow", "confirm", "deny"]
+    source: Literal["whitelist", "rbac", "approval", "policy"]
+    code: str | None
+    reason: str | None
+
+class ApprovalStore:
+    def __init__(self) -> None:
+        self._approvals: dict[str, dict] = {}
+
+    def canonical_json(self,obj: dict) -> str:
+        # 键排序 + 紧凑分隔 + ensure_ascii=False
+        return json.dumps(
+            obj,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+    def approval_digest(self, args: dict) -> str:
+        return sha256(self.canonical_json(args).encode()).hexdigest()
+
+    def approve(self, approval_id: str, *, user_id: str, tenant_id: str|None,
+                tool_name: str, args: dict, ttl_seconds: int = 3000) -> None:
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        if approval_id in self._approvals:
+            raise ValueError(f"duplicate approval_id: {approval_id}")
+        self._approvals[approval_id] = {
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "tool_name": tool_name,
+            "digest": self.approval_digest(args),
+            "expires_at": monotonic() + ttl_seconds,
+            "used": False,
+        }
+    
+    def consume(self, approval_id: str | None, tool_name: str,
+                args: dict, ctx: ExecutionContext) -> None:
+        # 未使用 + 未过期 + 用户/租户/工具/摘要全匹配,否则视同无审批(APPROVAL_REQUIRED)
+        # 匹配则置 used=True(一次性)
+        approval = self._approvals.get(approval_id) if approval_id is not None else None
+        if (
+            approval is None
+            or approval["used"]
+            or approval["expires_at"] <= monotonic()
+            or approval["user_id"] != ctx.user_id
+            or approval["tenant_id"] != getattr(ctx, "tenant_id", None)
+            or approval["tool_name"] != tool_name
+            or approval["digest"] != self.approval_digest(args)
+        ):
+            raise ValueError("APPROVAL_REQUIRED")
+        approval["used"] = True
+
+class PermissionEngine:
+    def __init__(self, approvals: ApprovalStore) -> None:
+        self._approvals = approvals          # 引擎持有审批库
+    
+    def decide(self, args, tool, ctx) -> Decision:
+        # 白名单 → RBAC → 高风险查 approvals → CONFIRM / ALLOW
+        # 权限只看 ctx.permissions，绝不读取 call.arguments 里的任何字段
+        #    （user_id / role / approved / permission 全都不可信）；
+        tool_policy = tool.policy
+        if tool_policy.permission not in ctx.permissions:
+            return Decision(
+                action="deny",
+                source="rbac",
+                code="PERMISSION_DENIED",
+                reason="当前身份没有调用该工具的权限",
+            )
+        # 无需审批动作直接放行（ALLOW）
+        if tool_policy.requires_approval is False:
+            return Decision(
+                action="allow",
+                source="policy",
+                code="DOT_NEED_APPROVAL",
+                reason="当前工具无需审批",
+            )
+        # requires_approval为true必须经过用户审批（APPROVAL_REQUIRED）才能执行
+        approval_id = getattr(ctx, "approval_id", None)
+        if approval_id is None:
+            return Decision(
+                action="confirm",
+                source="approval",
+                code="APPROVAL_REQUIRED",
+                reason="该调用需要用户确认",
+            )
+        if approval_id is not None:
+            try:
+                self._approvals.consume(
+                    approval_id=approval_id,
+                    tool_name=tool.name,
+                    args=args.model_dump(mode="json"),
+                    ctx=ctx,
+                )
+                return Decision(
+                    action="allow",
+                    source="approval",
+                    code="PERMISSION_GRANTED",
+                    reason="当前身份有调用该工具的权限",
+                )
+            except ValueError:
+                return Decision(
+                    action="confirm",
+                    source="approval",
+                    code="APPROVAL_REQUIRED",
+                    reason="该调用需要用户确认",
+                )
+
+
 class MiniToolRuntime:
-    def __init__(self):
-        self._tools: dict[str, ToolDefinition] = {}
+    def __init__(self, tools=None, permissions=None):
+        self._tools = tools if tools is not None else dict[str, ToolDefinition]()
+        self._permissions = permissions if permissions is not None else PermissionEngine(ApprovalStore())
     
     def register(self, tool: ToolDefinition) -> Callable[[], None]:
         if tool.name in self._tools:
@@ -491,7 +734,7 @@ class MiniToolRuntime:
         return [
             tool.to_model_tool()
             for tool in self._tools.values()
-            if tool.permission in ctx.permissions
+            if tool.policy.permission in ctx.permissions
         ]
     
     def _finish_error(
@@ -548,20 +791,14 @@ class MiniToolRuntime:
             ))
         
         # 2.authorize 检查权限
-        # 权限只看 ctx.permissions，绝不读取 call.arguments 里的任何字段
-        #    （user_id / role / approved / permission 全都不可信）；
-        if tool.permission not in ctx.permissions:
-            return self._finish_error(call, ctx, started, ToolError(
-                code="PERMISSION_DENIED",
-                message="当前身份没有调用该工具的权限",
-            ))
-        # 高风险动作还必须出现在 ctx.approved_actions 里
-        if tool.risk == "high" and call.name not in ctx.approved_actions:
-            return self._finish_error(call, ctx, started, ToolError(
-                code="APPROVAL_REQUIRED",
-                message="该调用需要用户确认",
-            ))
-    
+        decision = self._permissions.decide(args, tool, ctx)
+        if decision.action == "deny":
+            return self._finish_error(call, ctx, started,
+        ToolError(code=decision.code, message=decision.reason))
+        if decision.action == "confirm":
+            return self._finish_error(call, ctx, started,
+        ToolError(code="APPROVAL_REQUIRED", message="该调用需要用户确认"))
+
         # 3.execute 执行 handler
         retry_policy = tool.retry
         for attempt in range(1, retry_policy.max_attempts + 1):
@@ -573,6 +810,12 @@ class MiniToolRuntime:
                     code="BUSINESS_ERROR",
                     message=str(exc),
                 )
+            except TimeoutError as exc:
+                error = ToolError(
+                    code="TIMEOUT",
+                    message=str(exc),
+                    retryable=True,
+                )
             except Exception:
                 error = ToolError(
                     code="UPSTREAM_ERROR",
@@ -581,7 +824,9 @@ class MiniToolRuntime:
                 )
 
             # 检查是否可以重试
-            can_retry = error.retryable and retry_policy.idempotent and error.code in retry_policy.retryable_codes and attempt < retry_policy.max_attempts
+            can_retry = False
+            if tool.policy.effect == "READ" or retry_policy.idempotent:
+                can_retry = error.retryable and error.code in retry_policy.retryable_codes and attempt < retry_policy.max_attempts
             if not can_retry:
                 return self._finish_error(call, ctx, started, error)
             # 退避
@@ -597,7 +842,7 @@ def test_normal_read_order() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset(),
+        # approved_actions=frozenset(),
         order_service=DemoOrderService(),
     )
     model = FakeModel([
@@ -621,7 +866,7 @@ def test_beyond_max_steps() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset(),
+        # approved_actions=frozenset(),
         order_service=DemoOrderService(),
     )
     model = FakeModel([
@@ -653,7 +898,7 @@ def test_disorder_tool_call_id() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset(),
+        # approved_actions=frozenset(),
         order_service=DemoOrderService(),
     )
 
@@ -667,24 +912,33 @@ def test_disorder_tool_call_id() -> None:
 
 #=================== DemoRetryOrderService start =========================
 class DemoRetryOrderService(DemoOrderService):
-    def __init__(self, fail_first=True):
+    def __init__(self, fail_first=True, exc=RuntimeError("模拟上游错误")):
         super().__init__()
         self.calls = 0
         self.fail_first = fail_first
+        self.exc = exc
 
     def search(self, order_id, user_id):
         self.calls += 1
         if self.fail_first:
             self.fail_first = False # 恢复False，避免第二次进入后还抛异常
-            raise RuntimeError("模拟上游错误")
+            raise self.exc
         return super().search(order_id, user_id)
 
     def refund(self, order_id, amount_cents, reason, user_id):
         self.calls += 1
         if self.fail_first:
             self.fail_first = False # 恢复False，避免第二次进入后还抛异常
-            raise RuntimeError("模拟上游错误")
+            raise self.exc
         return super().refund(order_id, amount_cents, reason, user_id)
+
+    def non_idempotent_query(self, order_id, user_id):
+        self.calls += 1
+        if self.fail_first:
+            self.fail_first = False # 恢复False，避免第二次进入后还抛异常
+            raise self.exc
+        return super().search(order_id, user_id)
+
 #=================== DemoRetryOrderService end ========================
 
 
@@ -695,7 +949,7 @@ def test_idempotent_retry_success() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset(),
+        # approved_actions=frozenset(),
         order_service=order_service,
     )
     model = FakeModel([
@@ -721,13 +975,22 @@ def test_idempotent_retry_success() -> None:
     print("  ✓ test5 幂等工具重试成功断言通过：两轮结束、assistant-first 回写、id 配对正确、幂等工具重试次数正确、退避时间正确")
 
 def test_non_idempotent_retry_failure() -> None:
-    runtime = MiniToolRuntime()
+    
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
     runtime.register(CREATE_REFUND)
+ 
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"})
+
     order_service = DemoRetryOrderService()
     ctx = ExecutionContext(
-        user_id="user_demo",
-        permissions=frozenset({"order:read", "order:write"}),
-        approved_actions=frozenset({"create_refund"}),
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
         order_service=order_service,
     )
     model = FakeModel([
@@ -754,7 +1017,7 @@ def test_idempotent_disretryable_codes() -> None:
     ctx = ExecutionContext(
         user_id="user_demo",
         permissions=frozenset({"order:read"}),
-        approved_actions=frozenset(),
+        # approved_actions=frozenset(),
         order_service=order_service,
     )
     model = FakeModel([
@@ -776,15 +1039,24 @@ def test_idempotent_disretryable_codes() -> None:
 
 
 def test_idempotent_retryable_codes_nowhitelist() -> None:
-    runtime = MiniToolRuntime()
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
     runtime.register(IDEMPOTENT_CREATE_REFUND)
     order_service = DemoRetryOrderService()
+
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="idempotent_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"})
+
     ctx = ExecutionContext(
-        user_id="user_demo",
-        permissions=frozenset({"order:read", "order:write"}),
-        approved_actions=frozenset({"idempotent_refund"}),
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
         order_service=order_service,
     )
+
     model = FakeModel([
         AssistantTurn(text=None, tool_calls=(
             ToolCall(id="t8_c1", name="idempotent_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'),
@@ -803,6 +1075,205 @@ def test_idempotent_retryable_codes_nowhitelist() -> None:
     print("  ✓ test8 幂等工具重试码非白名单断言通过：两轮结束、assistant-first 回写、id 配对正确、幂等工具重试码非白名单不重试 正确")
 
 
+def test_change_amount_after_approval_failure() -> None:
+    global HANDLER_CALLS
+    HANDLER_CALLS = 0
+
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(CREATE_REFUND)
+    runtime.register(GET_ORDER)
+    
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"})
+
+    legit_ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=DemoOrderService())
+    
+    result = runtime.execute(ToolCall(id="call_id_8", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 200, "reason": "质量问题"}'), legit_ctx)
+
+    assert result.is_error is True 
+    assert "APPROVAL_REQUIRED" in result.content
+    assert HANDLER_CALLS == 0, f"副作用断言失败：篡改审批金额后退款执行，handler_calls={HANDLER_CALLS}"
+    print("  ✓ 负例断言通过：审批后篡改退款金额 退款拒绝")
+
+def test_approval_once_action_twice_failure() -> None:
+    global HANDLER_CALLS
+    HANDLER_CALLS = 0
+
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(CREATE_REFUND)
+    runtime.register(GET_ORDER)
+    
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"})
+
+    legit_ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=DemoOrderService())
+    
+    result1 = runtime.execute(ToolCall(id="call_id_9", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"}'), legit_ctx)
+    result2 = runtime.execute(ToolCall(id="call_id_10", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "质量问题"}'), legit_ctx)
+
+    assert result1.is_error is False 
+    assert result2.is_error is True
+    assert "APPROVAL_REQUIRED" in result2.content
+    assert HANDLER_CALLS == 1, f"副作用断言失败：审批一次退款两次，handler_calls={HANDLER_CALLS}"
+    print("  ✓ 负例断言通过：审批一次退款两次，拒绝")
+
+def test_non_idempotent_timeout_error_retry_failure() -> None:
+    
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(CREATE_REFUND)
+ 
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"})
+
+    order_service = DemoRetryOrderService(exc=TimeoutError("模拟超时错误"))
+    ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t6_c1", name="create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'),
+        )),
+        AssistantTurn(text="退款失败，请稍后再试。", tool_calls=()),
+    ])
+    answer = run_order_agent("为 ord_1003 创建退款", runtime, ctx, model)
+    assert answer == "退款失败，请稍后再试。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t6_c1"
+    assert order_service.calls == 1, f"非幂等工具重试次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "TIMEOUT"
+    print("  ✓ test9 非幂等工具超时重试失败断言通过：两轮结束、assistant-first 回写、id 配对正确、非幂等工具未重试 正确")
+
+def test_non_idempotent_retry_success() -> None:
+    
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(NON_IDEMPOTENT_QUERY)
+ 
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="non_idempotent_query",
+            args={"order_id": "ord_1003"})
+
+    order_service = DemoRetryOrderService()
+    ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t10_c1", name="non_idempotent_query", arguments_json='{"order_id": "ord_1003"}'),
+        )),
+        AssistantTurn(text="退款成功。", tool_calls=()),
+    ])
+    answer = run_order_agent("为 ord_1003 创建退款", runtime, ctx, model)
+    assert answer == "退款成功。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t10_c1"
+    assert order_service.calls == 2, f"非幂等工具重试次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["order_id"] == "ord_1003"
+    print("  ✓ test10 非幂等工具重试成功断言通过：两轮结束、assistant-first 回写、id 配对正确、非幂等工具未重试 正确")
+
+def test_non_idempotent_retryable_codes_whitelist() -> None:
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(RETRYABLE_CREATE_REFUND)
+    order_service = DemoRetryOrderService(exc=TimeoutError("模拟超时错误"))
+
+    store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+            user_id="user_demo", tenant_id=None,
+            tool_name="retryable_create_refund",
+            args={"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"})
+
+    ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=order_service,
+    )
+
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t11_c1", name="retryable_create_refund", arguments_json='{"order_id": "ord_1003", "amount_cents": 100, "reason": "customer_request"}'),
+        )),
+        AssistantTurn(text="订单 ord_1003 异常。", tool_calls=()),
+    ])
+
+    answer = run_order_agent("将 ord_1003 退款", runtime, ctx, model)
+    assert answer == "订单 ord_1003 异常。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t11_c1"
+    assert order_service.calls == 1, f"非幂等工具重试码白名单调用次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "TIMEOUT"
+    print("  ✓ test11 非幂等工具重试码白名单断言通过：两轮结束、assistant-first 回写、id 配对正确、非幂等工具重试码白名单不重试 正确")
+
+def test_medium_risk_approval_query() -> None:
+    
+    store = ApprovalStore()                          # ①  测试造
+    engine = PermissionEngine(approvals=store)       # ②  测试注入引擎
+    runtime = MiniToolRuntime(permissions=engine)   # ③ 引擎注入 runtime
+    runtime.register(MEDIUM_RISK_APPROVAL_QUERY)
+ 
+    # store.approve("appr_1",                          # ④  测试扮演"点确认的人"
+    #         user_id="user_demo", tenant_id=None,
+    #         tool_name="medium_risk_approval_query",
+    #         args={"order_id": "ord_1003"})
+
+    order_service = DemoRetryOrderService()
+    ctx = ExecutionContext(
+        user_id="user_demo", 
+        approval_id="appr_1",
+        permissions=frozenset({"order:read", "order:write"}), # 对订单有读写权限
+        order_service=order_service,
+    )
+    model = FakeModel([
+        AssistantTurn(text=None, tool_calls=(
+            ToolCall(id="t12_c1", name="medium_risk_approval_query", arguments_json='{"order_id": "ord_1003"}'),
+        )),
+        AssistantTurn(text="退款失败。", tool_calls=()),
+    ])
+    answer = run_order_agent("为 ord_1003 创建退款", runtime, ctx, model)
+    assert answer == "退款失败。"
+    # 第二轮收到的 messages:回写顺序必须是 assistant 在前、tool 在后
+    round = model.received[1]
+    assert round[2]["role"] == "assistant" and "tool_calls" in round[2]
+    assert round[3]["role"] == "tool" and round[3]["tool_call_id"] == "t12_c1"
+    assert order_service.calls == 0, f"中风险审批查询工具重试次数不对，实际={order_service.calls}"
+    assert json.loads(round[3]["content"])["error"]["code"] == "APPROVAL_REQUIRED"
+    print("  ✓ test12 中风险审批查询工具执行失败断言通过：两轮结束、assistant-first 回写、id 配对正确、工具未重试 正确")
+
 def run_offline_tests() -> None:
     print("== 离线测试 start ==")
     test_normal_read_order()
@@ -812,11 +1283,17 @@ def run_offline_tests() -> None:
     test_non_idempotent_retry_failure()
     test_idempotent_disretryable_codes()
     test_idempotent_retryable_codes_nowhitelist()
+    test_non_idempotent_timeout_error_retry_failure()
+    test_non_idempotent_retry_success()
+    test_non_idempotent_retryable_codes_whitelist()
+    test_medium_risk_approval_query()
     print("== 离线测试 end ==")
 
 def main() -> None:
     print("== 8_tool_loop ==")
     run_side_effect_suite()
+    test_change_amount_after_approval_failure()
+    test_approval_once_action_twice_failure()
     run_offline_tests()
     if "--real" in sys.argv:
         print("== 真实模型回归 ==")
