@@ -1,0 +1,13 @@
+Generating embeddings:   0%|          | 0/30 [00:00<?, ?it/s]2026-10-07 00:23:02.743 python[56795:25194997] 2026-10-07 00:23:02.743638 [W:onnxruntime:Default, telemetry.cc:800 operator()] Failed to persist telemetry device ID; using an in-memory identifier
+/Users/wilson/deepseek-work/rag_demo/.venv/lib/python3.13/site-packages/huggingface_hub/utils/tqdm.py:176: UserWarning: Cannot enable progress bars: environment variable `HF_HUB_DISABLE_PROGRESS_BARS=1` is set and has priority.
+  warnings.warn(
+Generating embeddings:  33%|███▎      | 10/30 [00:00<00:01, 19.56it/s]Generating embeddings:  67%|██████▋   | 20/30 [00:00<00:00, 27.68it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 29.88it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 28.02it/s]
+2026-10-07 00:23:11.761 python[56795:25195007] NetworkStorageDB:_openDBReadConnections: failed to open read connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:23:11.761 python[56795:25195007] The read-connection to the DB=/Users/wilson/Library/Caches/python/Cache.db is NOT valid.  Unable to determine schema version.
+2026-10-07 00:23:11.761 python[56795:25195007] NetworkStorageDB:_openDBWriteConnections: failed to open write connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:23:11.762 python[56795:25195007] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db.
+2026-10-07 00:23:11.762 python[56795:25195007] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-shm.
+2026-10-07 00:23:11.762 python[56795:25195007] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-wal.
+2026-10-07 00:23:12.999 python[56795:25195218] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x157cc9300) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:23:13.492 python[56795:25195218] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x157cc9300) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+E1007 00:25:14.694233 25195127 chttp2_transport.cc:1432] ipv4:127.0.0.1:62858: Received a GOAWAY with error code ENHANCE_YOUR_CALM and debug data equal to "too_many_pings". Current keepalive time (before throttling): 10000ms

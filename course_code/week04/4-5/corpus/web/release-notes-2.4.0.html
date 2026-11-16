@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>login_demo v2.4.0 发布说明</title>
+</head>
+<body>
+  <h1>login_demo v2.4.0 发布说明</h1>
+  <p>发布日期：2026-09-20。本次发布调整了登录会话的到期判定。</p>
+
+  <h2>变更内容</h2>
+  <ul>
+    <li>到期时刻改为判定为无效，修复"剩 0 秒仍可访问"的问题。</li>
+    <li>会话有效期维持 30 分钟不变。</li>
+    <li>新增响应头 <code>X-Session-Expires-At</code>，返回续期后的到期时间戳。</li>
+  </ul>
+
+  <h2>升级注意</h2>
+  <p>依赖旧行为的调用方需要先确认：凡是把到期时刻当成有效的客户端逻辑，都要改成无效。</p>
+
+  <h2>已知问题</h2>
+  <p>退出登录接口尚未实现，调用会抛出 NotImplementedError。计划在 v2.5.0 提供。</p>
+</body>
+</html>

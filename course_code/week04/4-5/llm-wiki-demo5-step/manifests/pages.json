@@ -1,0 +1,79 @@
+{
+  "pages_manifest_version": 1,
+  "note": "页面注册表。content_sha256 = 发布文件内容的 SHA-256，用于后续来源变化时判定是否需要重检。发布为逐文件复制，非事务性。",
+  "published_at": "2026-10-09",
+  "published_from_snapshot": "raw/v1",
+  "approved_by": "未知",
+  "approval_note": "本项目无审批系统；页面由 pre-publish 检查通过后发布，检查记录见 reports/prepublish.md 与 logs/2026-10-09-publish.md。不存在人工审批人。",
+  "pages": [
+    {
+      "page_id": "PAGE-LOGIN-SESSION",
+      "title": "登录会话（有效期、判定、续期）",
+      "path": "wiki/technical/login-session.md",
+      "draft_path": "staging/technical/login-session.md",
+      "version": 1,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "65eff55065f0955e9bbf93f713bce100379a065be922c9fd63261638bc3c1083",
+      "line_count": 123,
+      "sources_used": ["SRC-001", "SRC-003", "SRC-004", "SRC-006", "SRC-007", "SRC-008", "SRC-012"],
+      "depends_on_pages": ["wiki/comparisons/session-types.md"],
+      "unresolved_count": 5
+    },
+    {
+      "page_id": "PAGE-TOKEN-LIFECYCLE",
+      "title": "令牌生命周期（签发、校验、检查、续期、清理、退出）",
+      "path": "wiki/technical/token-lifecycle.md",
+      "draft_path": "staging/technical/token-lifecycle.md",
+      "version": 1,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "0285c5162dea6afab69cc309eb64d7535fee0853b32a0d9dba9fdba3f424d000",
+      "line_count": 152,
+      "sources_used": ["SRC-001", "SRC-002", "SRC-003", "SRC-010"],
+      "depends_on_pages": ["wiki/technical/login-session.md", "wiki/project/logout-plan.md"],
+      "unresolved_count": 6
+    },
+    {
+      "page_id": "PAGE-SESSION-TYPES",
+      "title": "会话类型对比（登录 / 支付 / 匿名浏览 / 记住我）",
+      "path": "wiki/comparisons/session-types.md",
+      "draft_path": "staging/comparisons/session-types.md",
+      "version": 1,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "dd571e8325d16e2d530323b3e776b12afe624b69898add8b6295445ad09a1686",
+      "line_count": 142,
+      "sources_used": ["SRC-003", "SRC-005", "SRC-006", "SRC-010", "SRC-011"],
+      "depends_on_pages": ["wiki/technical/login-session.md"],
+      "unresolved_count": 5
+    },
+    {
+      "page_id": "PAGE-LOGOUT-PLAN",
+      "title": "退出登录方案（需求 / 当前实现 / 验收 / 未决）",
+      "path": "wiki/project/logout-plan.md",
+      "draft_path": "staging/project/logout-plan.md",
+      "version": 1,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "254d1c145c4544b2eb604690015dc6a2f99b75d13b074f5813c9d361890ecc09",
+      "line_count": 160,
+      "sources_used": ["SRC-001", "SRC-003", "SRC-007", "SRC-009", "SRC-010", "SRC-012"],
+      "depends_on_pages": ["wiki/technical/token-lifecycle.md"],
+      "unresolved_count": 6
+    }
+  ],
+  "link_check": {
+    "raw_source_links": 87,
+    "cross_page_links": 9,
+    "broken": 0,
+    "checked_from": "发布后实际路径 wiki/<子目录>/"
+  },
+  "capability_limits": [
+    "无审批系统：approved_by 恒为“未知”",
+    "无权限模型：owner 等字段仅为描述，不构成鉴权",
+    "无原子发布：逐文件复制，非事务性",
+    "无并发控制：仅检查目标文件不存在，无锁",
+    "无自动回归：哈希校验为一次性人工动作"
+  ]
+}

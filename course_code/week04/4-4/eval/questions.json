@@ -1,0 +1,75 @@
+{
+  "corpus_note": "login_demo 项目的资料。问题由工程师提供，正确证据在 gold 里标注，验收标准写在 required_facts / forbidden_facts。",
+  "questions": [
+    {
+      "id": "q1",
+      "question": "登录会话的有效期是多少分钟？",
+      "gold": [{"file": "docs/session-rules.md", "heading": "有效期长度"}],
+      "required_facts": ["30 分钟"],
+      "forbidden_facts": ["5 分钟"],
+      "note": "支付会话文档里也有 5 分钟，是干扰项。"
+    },
+    {
+      "id": "q2",
+      "question": "会话恰好到期的那一刻，应该算有效还是无效？",
+      "gold": [
+        {"file": "docs/session-rules.md", "heading": "到期边界"},
+        {"file": "history/2026-09-12-expiry-bug.md", "heading": "结论"}
+      ],
+      "required_facts": ["无效"],
+      "forbidden_facts": [],
+      "note": "规则文档和历史故障记录各给一半证据。"
+    },
+    {
+      "id": "q3",
+      "question": "如果我要给 login_demo 增加退出登录功能，需要改哪些文件？",
+      "gold": [{"file": "history/2026-10-06-logout-request.md", "heading": "需要改的地方"}],
+      "required_facts": ["app/auth.py"],
+      "forbidden_facts": [],
+      "note": "需求讨论记录里列了三个文件。"
+    },
+    {
+      "id": "q4",
+      "question": "退出登录改完以后，用哪条命令验证？",
+      "gold": [{"file": "docs/testing-guide.md", "heading": "测试入口"}],
+      "required_facts": ["python -m pytest tests/test_session.py -q"],
+      "forbidden_facts": [],
+      "note": "测试指南里同时写了错误写法，容易抄错。"
+    },
+    {
+      "id": "q5",
+      "question": "用户点登出以后，还能拿原来的令牌调用 check 吗？",
+      "gold": [{"file": "history/2026-10-06-logout-request.md", "heading": "验收标准"}],
+      "required_facts": ["False"],
+      "forbidden_facts": [],
+      "note": "问题里用的是“登出”，文档里写的是“退出登录”，考察同义改写。"
+    },
+    {
+      "id": "q6",
+      "question": "SESSION_TTL_SECONDS 这个常量的值是多少？",
+      "gold": [{"file": "app/session.py", "heading": ""}],
+      "required_facts": ["1800"],
+      "forbidden_facts": [],
+      "note": "符号名精确匹配，代码里的常量注释写着 1800 的来历。"
+    },
+    {
+      "id": "q7",
+      "question": "登录会话和支付会话在有效期、能不能续期上有什么区别？",
+      "gold": [
+        {"file": "docs/session-rules.md", "heading": "有效期长度"},
+        {"file": "docs/payment-session.md", "heading": "与登录会话的区别"}
+      ],
+      "required_facts": ["30 分钟", "5 分钟"],
+      "forbidden_facts": [],
+      "note": "需要两处证据才能答全。"
+    },
+    {
+      "id": "q8",
+      "question": "线上反馈登录状态老是掉，按项目现有文档应该怎么排查？",
+      "gold": [{"file": "docs/faq.md", "heading": "用户反馈\"登录状态老是掉\""}],
+      "required_facts": ["30 分钟"],
+      "forbidden_facts": [],
+      "note": "排查步骤加上默认配置。"
+    }
+  ]
+}

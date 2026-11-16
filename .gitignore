@@ -7,3 +7,4 @@ __pycache__/
 /docs/
 node_modules/
 dist/
+__pycache__/

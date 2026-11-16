@@ -1,0 +1,4 @@
+Generating embeddings:   0%|          | 0/30 [00:00<?, ?it/s]2026-10-07 00:26:14.529 python[57056:25197857] 2026-10-07 00:26:14.529729 [W:onnxruntime:Default, telemetry.cc:800 operator()] Failed to persist telemetry device ID; using an in-memory identifier
+/Users/wilson/deepseek-work/rag_demo/.venv/lib/python3.13/site-packages/huggingface_hub/utils/tqdm.py:176: UserWarning: Cannot enable progress bars: environment variable `HF_HUB_DISABLE_PROGRESS_BARS=1` is set and has priority.
+  warnings.warn(
+Generating embeddings:  33%|███▎      | 10/30 [00:00<00:01, 18.08it/s]Generating embeddings:  67%|██████▋   | 20/30 [00:00<00:00, 23.64it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 24.67it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 23.63it/s]

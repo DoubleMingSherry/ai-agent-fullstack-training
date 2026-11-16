@@ -1,0 +1,83 @@
+[准备] 9 个文档 → 30 个节点（按标题切）
+[问题集] 8 题，每题都标了 gold 证据
+
+================================================================================================
+① 向量 / BM25 / Hybrid 在同一批问题上的逐题结果（top-3）
+================================================================================================
+  配置              召回率     命中率     完全命中题数        问题数     
+  向量              0.312   0.375   2             8       
+  BM25            0.625   0.75    4             8       
+  RRF等权候选3        0.375   0.5     2             8       
+  RRF等权候选10       0.5     0.625   3             8       
+  RRF加权候选10       0.562   0.625   4             8       
+
+逐题对比（√ = 该题的 gold 进了 top-3）：
+  题号    向量                  BM25                RRF等权候选3            RRF等权候选10           RRF加权候选10           
+  q1    √ docs/session-rul  √ app/config.py §   √ docs/session-rul  √ docs/session-rul  √ docs/session-rul  
+  q2    × history/2026-10-  √ docs/session-rul  √ history/2026-10-  √ docs/session-rul  √ docs/session-rul  
+  q3    × docs/session-rul  × history/2026-10-  × history/2026-10-  × history/2026-10-  × history/2026-10-  
+  q4    × docs/faq.md § 常见  × history/2026-10-  × docs/faq.md § 常见  × history/2026-10-  × history/2026-10-  
+  q5    × docs/session-rul  √ history/2026-09-  × docs/session-rul  × docs/session-rul  × docs/session-rul  
+  q6    × docs/session-rul  √ app/config.py §   × docs/session-rul  √ app/session.py §  √ app/session.py §  
+  q7    √ docs/payment-ses  √ docs/payment-ses  √ docs/payment-ses  √ docs/payment-ses  √ docs/payment-ses  
+  q8    √ history/2026-10-  √ docs/faq.md § 常见  √ docs/faq.md § 常见  √ docs/faq.md § 常见  √ docs/faq.md § 常见  
+
+四种配置互相不一致的题：
+  q2 会话恰好到期的那一刻，应该算有效还是无效？
+      向量             漏掉 → history/2026-10-06-logout-request.md § 需求讨论 2026-10-06：增加退出登录功能 > 背景
+      BM25           命中 → docs/session-rules.md § 登录会话有效期规则 > 到期边界
+      RRF等权候选3       命中 → history/2026-10-06-logout-request.md § 需求讨论 2026-10-06：增加退出登录功能 > 背景
+      RRF等权候选10      命中 → docs/session-rules.md § 登录会话有效期规则 > 到期边界
+      RRF加权候选10      命中 → docs/session-rules.md § 登录会话有效期规则 > 到期边界
+  q5 用户点登出以后，还能拿原来的令牌调用 check 吗？
+      向量             漏掉 → docs/session-rules.md § 登录会话有效期规则 > 有效期长度
+      BM25           命中 → history/2026-09-12-expiry-bug.md § 故障记录 2026-09-12：到期那一刻仍然可以访问 > 现象
+      RRF等权候选3       漏掉 → docs/session-rules.md § 登录会话有效期规则 > 有效期长度
+      RRF等权候选10      漏掉 → docs/session-rules.md § 登录会话有效期规则 > 有效期长度
+      RRF加权候选10      漏掉 → docs/session-rules.md § 登录会话有效期规则 > 有效期长度
+  q6 SESSION_TTL_SECONDS 这个常量的值是多少？
+      向量             漏掉 → docs/session-rules.md § 登录会话有效期规则 > 到期边界
+      BM25           命中 → app/config.py § (整文件)
+      RRF等权候选3       漏掉 → docs/session-rules.md § 登录会话有效期规则 > 到期边界
+      RRF等权候选10      命中 → app/session.py § (整文件)
+      RRF加权候选10      命中 → app/session.py § (整文件)
+
+================================================================================================
+② Metadata Filter：用 front-matter 的 service 字段把干扰文档挡在外面
+================================================================================================
+query = 会话的有效期是多少分钟？
+  不过滤：
+    [1] docs/session-rules.md § 登录会话有效期规则 > 续期  score=0.8388
+    [2] docs/session-rules.md § 登录会话有效期规则 > 不适用范围  score=0.8259
+    [3] docs/session-rules.md § 登录会话有效期规则 > 有效期长度  score=0.8119
+    [4] docs/payment-session.md § 支付会话规则 > 与登录会话的区别  score=0.8053
+    [5] docs/session-rules.md § 登录会话有效期规则 > 到期边界  score=0.8016
+  过滤 service=login_demo：
+    [1] docs/session-rules.md § 登录会话有效期规则 > 续期  score=0.8388
+    [2] docs/session-rules.md § 登录会话有效期规则 > 不适用范围  score=0.8259
+    [3] docs/session-rules.md § 登录会话有效期规则 > 有效期长度  score=0.8119
+    [4] docs/session-rules.md § 登录会话有效期规则 > 到期边界  score=0.8016
+    [5] docs/session-rules.md § 登录会话有效期规则  score=0.7895
+
+================================================================================================
+③ Embedding 模型与维度：召回从哪里来
+================================================================================================
+  配置                维度    召回率     命中率     完全命中题数        建库秒     本地    
+  MiniMax embo-01   1536  0.312   0.375   2             8.6     否     
+  MiniMax 截断        256   0.312   0.375   2             9.5     否     
+  BGE-small-zh 本地   512   0.688   0.75    5             1.8     是     
+  BM25（参考）          -     0.625   0.75    4/8          -       是
+
+[embedding 调用] MiniMax 侧 68 次请求、140 条文本、38.7s；BGE 本地不产生 API 调用
+
+================================================================================================
+④ 换好模型再混合：BGE + BM25 的各种组合
+================================================================================================
+  BGE 单独                 召回率=0.688   命中率=0.75    完全命中=5/8
+  BGE+BM25 等权候选10        召回率=0.75    命中率=0.875   完全命中=5/8
+  BGE+BM25 等权候选20        召回率=0.75    命中率=0.875   完全命中=5/8
+  BGE 70% + BM25 30%     召回率=0.812   命中率=0.875   完全命中=6/8
+
+  本批问题上的最好配置：BGE 70% + BM25 30%
+  这个配置仍然漏掉的题：
+    q4 退出登录改完以后，用哪条命令验证？ → top1 history/2026-10-06-logout-request.md § 需求讨论 2026-10-06：增加退出登录功能 > 验收标准

@@ -1,0 +1,10 @@
+llama-index-core==0.14.25
+llama-index-vector-stores-milvus==1.2.0
+pymilvus[milvus-lite]==2.6.17
+milvus-lite==3.2.1
+openai==3.24.0
+llama-index-retrievers-bm25==0.8.0
+jieba==0.42.1
+pypdf==6.19.0
+rank_bm25==0.2.2
+fastembed==0.8.1
