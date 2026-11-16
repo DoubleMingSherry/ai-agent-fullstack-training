@@ -1,0 +1,176 @@
+{
+  "pages_manifest_version": 1,
+  "note": "页面注册表。content_sha256 = 发布文件内容的 SHA-256，用于后续来源变化时判定是否需要重检。发布为逐文件复制，非事务性。",
+  "pending_review": {
+    "marked_at": "2026-10-09",
+    "trigger": "SRC-013 (raw/v2/docs/session-rules.md) 替代 SRC-006 (raw/v1/docs/session-rules.md)：登录会话有效期 30 分钟 → 60 分钟",
+    "review_status": "resolved-by-v2-update",
+    "note": "阶段一标记待复核；阶段二已逐个更新并复核，见各页 version 与 wiki/log.md。此字段保留为历史记录，不再表示“待处理”。",
+    "affected_direct": [
+      "PAGE-LOGIN-SESSION",
+      "PAGE-SESSION-TYPES",
+      "PAGE-LOGIN-ONBOARDING"
+    ],
+    "affected_indirect": [
+      "PAGE-TOKEN-LIFECYCLE",
+      "PAGE-LOGOUT-PLAN"
+    ],
+    "detail_report": "reports/update-impact.md"
+  },
+  "published_at": "2026-10-09",
+  "published_from_snapshot": "raw/v1 + raw/v2",
+  "current_rules_snapshot": "raw/v2",
+  "approved_by": "未知",
+  "approval_note": "本项目无审批系统；页面由 pre-publish 检查通过后发布，检查记录见 reports/prepublish.md 与 logs/2026-10-09-publish.md。不存在人工审批人。",
+  "pages": [
+    {
+      "page_id": "PAGE-LOGIN-SESSION",
+      "title": "登录会话（有效期、判定、续期）",
+      "path": "wiki/technical/login-session.md",
+      "draft_path": "staging/technical/login-session.md",
+      "version": 2,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "0cdf72f58cee524c3532b3317253ecd94985a0ecb35c47152eebd45a1984a783",
+      "line_count": 212,
+      "sources_used": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-004",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-012",
+        "SRC-013"
+      ],
+      "depends_on_pages": [
+        "wiki/comparisons/session-types.md"
+      ],
+      "unresolved_count": 8,
+      "updated_at": "2026-10-09",
+      "update_reason": "SRC-013 (raw/v2) 替代 SRC-006：登录会话规则 30 分钟 → 60 分钟"
+    },
+    {
+      "page_id": "PAGE-TOKEN-LIFECYCLE",
+      "title": "令牌生命周期（签发、校验、检查、续期、清理、退出）",
+      "path": "wiki/technical/token-lifecycle.md",
+      "draft_path": "staging/technical/token-lifecycle.md",
+      "version": 2,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "193bc8799563a457c817e3777aa8908760e47349c0fb12927044d73c6a2aadae",
+      "line_count": 177,
+      "sources_used": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-003",
+        "SRC-010",
+        "SRC-013"
+      ],
+      "depends_on_pages": [
+        "wiki/technical/login-session.md",
+        "wiki/project/logout-plan.md"
+      ],
+      "unresolved_count": 6,
+      "updated_at": "2026-10-09",
+      "update_reason": "SRC-013 (raw/v2) 替代 SRC-006：登录会话规则 30 分钟 → 60 分钟"
+    },
+    {
+      "page_id": "PAGE-SESSION-TYPES",
+      "title": "会话类型对比（登录 / 支付 / 匿名浏览 / 记住我）",
+      "path": "wiki/comparisons/session-types.md",
+      "draft_path": "staging/comparisons/session-types.md",
+      "version": 2,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "9915816fd602e03eb4855c42f9553b79a8f205206e613deb2efd56f5bd90031d",
+      "line_count": 180,
+      "sources_used": [
+        "SRC-003",
+        "SRC-005",
+        "SRC-006",
+        "SRC-010",
+        "SRC-011",
+        "SRC-013"
+      ],
+      "depends_on_pages": [
+        "wiki/technical/login-session.md"
+      ],
+      "unresolved_count": 6,
+      "updated_at": "2026-10-09",
+      "update_reason": "SRC-013 (raw/v2) 替代 SRC-006：登录会话规则 30 分钟 → 60 分钟"
+    },
+    {
+      "page_id": "PAGE-LOGOUT-PLAN",
+      "title": "退出登录方案（需求 / 当前实现 / 验收 / 未决）",
+      "path": "wiki/project/logout-plan.md",
+      "draft_path": "staging/project/logout-plan.md",
+      "version": 2,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "e02d3a8032c95877fec96122859d637eba82d65e2e870a317d5f82581e9cc505",
+      "line_count": 180,
+      "sources_used": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-007",
+        "SRC-009",
+        "SRC-010",
+        "SRC-012",
+        "SRC-013"
+      ],
+      "depends_on_pages": [
+        "wiki/technical/token-lifecycle.md"
+      ],
+      "unresolved_count": 6,
+      "updated_at": "2026-10-09",
+      "update_reason": "SRC-013 (raw/v2) 替代 SRC-006：登录会话规则 30 分钟 → 60 分钟"
+    },
+    {
+      "page_id": "PAGE-LOGIN-ONBOARDING",
+      "title": "新人上手问答（登录会话）",
+      "type": "queries",
+      "path": "wiki/queries/login-onboarding.md",
+      "draft_path": null,
+      "version": 2,
+      "status": "published",
+      "published_at": "2026-10-09",
+      "content_sha256": "aa19e931302bdca74c55df77bfed1128b8a15d99f20386ed97027239d58281dd",
+      "line_count": 263,
+      "sources_used": [
+        "SRC-001",
+        "SRC-003",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009",
+        "SRC-010",
+        "SRC-012",
+        "SRC-013"
+      ],
+      "depends_on_pages": [
+        "wiki/technical/login-session.md",
+        "wiki/technical/token-lifecycle.md",
+        "wiki/project/logout-plan.md",
+        "wiki/comparisons/session-types.md"
+      ],
+      "unresolved_count": 8,
+      "note": "问答页，直接在 wiki/ 生成（无 staging 草稿）。所有结论直接回查 raw/v1，知识页仅作导航与交叉印证，不作最终依据。",
+      "updated_at": "2026-10-09",
+      "update_reason": "SRC-013 (raw/v2) 替代 SRC-006：登录会话规则 30 分钟 → 60 分钟"
+    }
+  ],
+  "link_check": {
+    "raw_source_links": 87,
+    "cross_page_links": 9,
+    "broken": 0,
+    "checked_from": "发布后实际路径 wiki/<子目录>/"
+  },
+  "capability_limits": [
+    "无审批系统：approved_by 恒为“未知”",
+    "无权限模型：owner 等字段仅为描述，不构成鉴权",
+    "无原子发布：逐文件复制，非事务性",
+    "无并发控制：仅检查目标文件不存在，无锁",
+    "无自动回归：哈希校验为一次性人工动作"
+  ]
+}

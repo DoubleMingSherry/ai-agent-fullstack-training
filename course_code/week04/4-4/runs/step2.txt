@@ -1,0 +1,89 @@
+==============================================================================
+① 解析：四种格式分别读成什么
+==============================================================================
+[PDF ] 原始抽取 488 字符，开头：<!-- page 1 --> / login_demo 产品需求说明 v2.5.0（草稿） / 文档编号 PRD-LOGIN-025，维护人：认证组。本说明用于规划退出登录功能。…
+[PDF ] 清洗后   472 字符，开头：login_demo 产品需求说明 v2.5.0（草稿） / 文档编号 PRD-LOGIN-025，维护人：认证组。本说明用于规划退出登录功能。 / 1. 目标 / 用户可以在任意…
+
+[HTML] 原文含标签 532 字符，开头：<!DOCTYPE html> / <html lang="zh-CN"> / <head> /   <meta charset="utf-8"> /   <title>login…
+[HTML] 解析后     272 字符，开头：# login_demo v2.4.0 发布说明 / 发布日期：2026-09-20。本次发布调整了登录会话的到期判定。 / ## 变更内容 / 到期时刻改为判定为无效，修复"剩 …
+
+[CSV ] 原文 5 行，第 1 行：服务,会话类型,有效期,可续期,到期边界处理,负责人
+[CSV ] 解析后 4 句，第 1 句：服务是login_demo；会话类型是登录会话；有效期是30 分钟；可续期是是；到期边界处理是恰好到期视为无效；负责人是认证组。 / 服务是pay_gateway；会话类型是支付会话；有效期是5 分钟；可续期是否；到期边界处理是到期即置为超…
+
+==============================================================================
+② 元数据：每个文档带上什么标签
+==============================================================================
+共 12 个文档
+  app/auth.py                            doc_type=code   source=py
+  app/config.py                          doc_type=code   source=py
+  app/session.py                         doc_type=code   source=py
+  docs/faq.md                            doc_type=doc    source=md
+  docs/payment-session.md                doc_type=doc    source=md
+  docs/session-rules.md                  doc_type=doc    source=md
+  docs/testing-guide.md                  doc_type=doc    source=md
+  history/2026-09-12-expiry-bug.md       doc_type=doc    source=md
+  history/2026-10-06-logout-request.md   doc_type=doc    source=md
+  pdf/PRD-login-2.5.0.pdf                doc_type=pdf    source=pdf
+  tables/session-matrix.csv              doc_type=table  source=csv
+  web/release-notes-2.4.0.html           doc_type=web    source=html
+
+==============================================================================
+③ 分块对比：同一批文档，六种切法
+==============================================================================
+[提示] llama-index 报了 4 次：Metadata length (52) is close to chunk size (96). Resulting chunks are less than 50 tokens. Consider increasing the chunk size or decreasing the size of your metadata to avoid this.
+       front-matter 让每个节点的元数据长到 50 字符左右，
+       它会被算进 chunk_size 预算，所以 96 token 的块实际只剩 40 多个 token。
+  策略                  节点数     平均字符      最长      带标题      函数完整        
+  固定长度 96 token 无重叠   71      85        277     19/71    6/10        
+  固定长度 96 token 重叠 24 78      89        259     19/78    6/10        
+  按段落 ≤200 字符         89      67        383     32/89    8/10        
+  按标题                 36      168       2460    34/36    10/10       
+  语义分块                15      407       1787    7/15     9/10        
+  代码 AST              14      180       383     14/14    10/10       
+
+  最长节点来自 app/auth.py（2460 字符，标题=(整文件)）
+
+==============================================================================
+④ Overlap：用字符窗口把切断的句子接回来
+==============================================================================
+原文 132 字符，窗口 40 字符
+[无重叠 overlap=0 ] 切出 4 块，第 1 块结尾：'当前时刻恰好等于到期时刻时，会话必须判定为无效。'
+                    含“不要写成 `now <= expires_at`”？否
+[有重叠 overlap=15] 切出 6 块
+                    含“不要写成 `now <= expires_at`”的块是第 5 块：'s_at`，不要写成 `now <= expires_at`。\n'
+
+换到真实的 docs/session-rules.md 正文（366 字符，已去掉 front-matter）：
+  overlap=0  切成 7 块，块数 × 窗口 = 420 字符
+  overlap=20 切成 10 块，块数 × 窗口 = 600 字符
+
+==============================================================================
+⑤ Chunk Metadata：一个节点的完整元数据
+==============================================================================
+{
+  "id": "4c670033-7c1c-40d7-8cde-c5fbf258fac3",
+  "metadata": {
+    "file_path": "docs/testing-guide.md",
+    "doc_type": "doc",
+    "source": "md",
+    "service": "login_demo",
+    "topic": "testing",
+    "owner": "认证组",
+    "updated": "2026-09-20",
+    "heading": "login_demo 测试指南 > 测试入口",
+    "header_path": "/login_demo 测试指南/"
+  },
+  "text_chars": 173
+}
+
+代码节点的元数据：
+{
+  "metadata": {
+    "file_path": "app/auth.py",
+    "doc_type": "code",
+    "source": "py",
+    "heading": "(模块变量)",
+    "kind": "assign",
+    "lines": "16-16"
+  },
+  "text": "_TOKEN_STORE: dict[str, dict] = {}"
+}

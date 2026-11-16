@@ -1,0 +1,219 @@
+{
+  "dependencies_version": 1,
+  "scope": "知识页依赖登记（对应 raw/v1 快照）",
+  "generated_at": "2026-10-09",
+  "note": "本文件只登记依赖与结论→证据映射，不含知识正文。来源链接按发布到 wiki/ 后的位置计算（wiki/technical/ -> ../../raw/v1/...）。页面状态见 manifests/pages.json。",
+  "snapshot": {
+    "snapshot_id": "v1",
+    "path": "raw/v1/",
+    "archive_sha256": "b63afc9409ffdb1fc8b68c4124f3078ac0bf19e0aa1db4571fabd3f414e4f5fa"
+  },
+  "pages": [
+    {
+      "page_id": "PAGE-LOGIN-SESSION",
+      "draft_path": "staging/technical/login-session.md",
+      "publish_path": "wiki/technical/login-session.md",
+      "title": "登录会话（有效期、判定、续期）",
+      "status": "published",
+      "version": 1,
+      "content_sha256": "65eff55065f0955e9bbf93f713bce100379a065be922c9fd63261638bc3c1083",
+      "sources_used": [
+        { "source_id": "SRC-003", "relative_path": "raw/v1/app/session.py", "sha256": "9eec7917294a60b522ed758edabdabca6e56f50299837772781453eedbfc2c94", "citations": ["L1-4 模块 docstring", "L6 SESSION_TTL_SECONDS", "L9-15 is_session_valid", "L18-20 refresh_expiry"] },
+        { "source_id": "SRC-001", "relative_path": "raw/v1/app/auth.py", "sha256": "6f62febaf33bf1292fee20dadf55c8c59ca92589f09bd5b20d90ca1867889442", "citations": ["L14 导入 session 符号", "L63-72 touch() 续期"] },
+        { "source_id": "SRC-006", "relative_path": "raw/v1/docs/session-rules.md", "sha256": "bfa3dbaa5c7b1df408032cc94bb23745ddc5afaa0aa10b3eefb7afab6c4bccdb", "citations": ["「有效期长度」", "「到期边界」", "「续期」", "「不适用范围」"] },
+        { "source_id": "SRC-007", "relative_path": "raw/v1/docs/testing-guide.md", "sha256": "524507aed1aae8a685618d78f546003a45f7b93adb37435728edb668f5b8cb2c", "citations": ["「测试入口」", "「关键用例」"] },
+        { "source_id": "SRC-008", "relative_path": "raw/v1/history/2026-09-12-expiry-bug.md", "sha256": "776a7b5696632034a89ebeea0459e2924d84192a6221cd2eb65ac1e93d9b8f81", "citations": ["「现象」", "「排查」", "「修复」"] },
+        { "source_id": "SRC-012", "relative_path": "raw/v1/web/release-notes-2.4.0.html", "sha256": "430eb87bfe96feaf16a20565cd842b85f2724ed3004925318dbc3d46308de34b", "citations": ["「变更内容」"] },
+        { "source_id": "SRC-004", "relative_path": "raw/v1/docs/faq.md", "sha256": "c28750172fb917b2b78da56a9f8649858b9d8a62c1f324f49ea0554f456944c2", "citations": ["「用户反馈\"登录状态老是掉\"」", "「能否把有效期改长一点」"] }
+      ],
+      "depends_on_pages": [
+        { "page": "wiki/comparisons/session-types.md", "relation": "本页登录会话规则是 Session 类型对比中 login 行的展开依据", "reason": "session-types 主表 login 行依赖本页的 30 分钟与边界结论" }
+      ],
+      "referenced_by_pages": [
+        { "page": "wiki/technical/token-lifecycle.md", "reason": "续期阶段引用登录会话的有效期与边界规则" },
+        { "page": "wiki/comparisons/session-types.md", "reason": "登录会话一节的展开" }
+      ],
+      "conclusion_evidence": [
+        { "conclusion_id": "LS-1", "claim": "登录会话有效期 30 分钟，从签发时刻起算", "kind": "原文事实", "evidence": [{ "source_id": "SRC-006", "location": "「有效期长度」", "quote": "管理后台的登录会话有效期为 30 分钟" }, { "source_id": "SRC-006", "location": "「有效期长度」", "quote": "从签发时刻开始计算，30 分钟后到期" }] },
+        { "conclusion_id": "LS-1a", "claim": "改长有效期需产品确认，且不得直接改代码常量", "kind": "原文事实", "evidence": [{ "source_id": "SRC-004", "location": "「能否把有效期改长一点」", "quote": "可以，但需要产品确认。修改前先读 `docs/session-rules.md`，不要直接改代码常量" }] },
+        { "conclusion_id": "LS-2", "claim": "now == expires_at 属于已过期；有效条件写作 now < expires_at", "kind": "原文事实", "evidence": [{ "source_id": "SRC-006", "location": "「到期边界」", "quote": "`now == expires_at` 属于已过期" }, { "source_id": "SRC-006", "location": "「到期边界」", "quote": "不要写成 `now <= expires_at`" }, { "source_id": "SRC-008", "location": "「结论」", "quote": "到期时刻必须判定为无效。这条结论对登录会话长期有效" }] },
+        { "conclusion_id": "LS-3", "claim": "续期由用户请求触发，新到期时间 = 请求到达时刻 + 30 分钟", "kind": "原文事实", "evidence": [{ "source_id": "SRC-006", "location": "「续期」", "quote": "新的到期时间 = 请求到达时刻 + 30 分钟" }] },
+        { "conclusion_id": "LS-4", "claim": "测试统一入口为 python -m pytest tests/test_session.py -q，先激活虚拟环境", "kind": "原文事实", "evidence": [{ "source_id": "SRC-007", "location": "「测试入口」", "quote": "统一入口：`python -m pytest tests/test_session.py -q`" }, { "source_id": "SRC-007", "location": "「测试入口」", "quote": "运行前先激活虚拟环境：`source .venv/bin/activate`" }, { "source_id": "SRC-004", "location": "「用户反馈\"登录状态老是掉\"」", "quote": "再看是不是恰好卡在到期时刻被判定为无效，检查边界用例" }] },
+        { "conclusion_id": "LS-5", "claim": "有效期为常量 SESSION_TTL_SECONDS = 30*60，定义在 session.py", "kind": "源码观察", "evidence": [{ "source_id": "SRC-003", "location": "L6", "quote": "SESSION_TTL_SECONDS = 30 * 60" }] },
+        { "conclusion_id": "LS-6", "claim": "有效条件实现为 now < expires_at，与文档一致", "kind": "源码观察", "evidence": [{ "source_id": "SRC-003", "location": "L15 is_session_valid", "quote": "return now < expires_at" }] },
+        { "conclusion_id": "LS-7", "claim": "续期实现为 now + SESSION_TTL_SECONDS", "kind": "源码观察", "evidence": [{ "source_id": "SRC-003", "location": "L20 refresh_expiry", "quote": "return now + SESSION_TTL_SECONDS" }] },
+        { "conclusion_id": "LS-8", "claim": "session.py 不签发不存储，只做时间判断", "kind": "源码观察", "evidence": [{ "source_id": "SRC-003", "location": "L1-4 模块 docstring", "quote": "本模块只负责\"令牌是否仍然有效\"的判断，不负责签发和存储" }] },
+        { "conclusion_id": "LS-9", "claim": "auth.py 是签发与续期的实际调用方", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L14", "quote": "from .session import SESSION_TTL_SECONDS, is_session_valid, refresh_expiry" }] },
+        { "conclusion_id": "LS-10", "claim": "2026-09-12 故障：到期仍可访问，判断曾误写为 now <= expires_at，已改为 <", "kind": "历史记录", "evidence": [{ "source_id": "SRC-008", "location": "「排查」", "quote": "发现判断写的是 `now <= expires_at`" }, { "source_id": "SRC-008", "location": "「修复」", "quote": "把比较运算符从 `<=` 改成 `<`" }] },
+        { "conclusion_id": "LS-11", "claim": "v2.4.0 把到期时刻改为无效，有效期维持 30 分钟", "kind": "历史记录", "evidence": [{ "source_id": "SRC-012", "location": "「变更内容」", "quote": "到期时刻改为判定为无效" }, { "source_id": "SRC-012", "location": "「变更内容」", "quote": "会话有效期维持 30 分钟不变" }, { "source_id": "SRC-012", "location": "「升级注意」", "quote": "凡是把到期时刻当成有效的客户端逻辑，都要改成无效" }] },
+        { "conclusion_id": "LS-12", "claim": "v2.4.0 新增响应头 X-Session-Expires-At", "kind": "历史记录", "evidence": [{ "source_id": "SRC-012", "location": "「变更内容」", "quote": "新增响应头 `X-Session-Expires-At`" }] },
+        { "conclusion_id": "LS-13", "claim": "文档规则、源码实现、历史修复三者对到期边界口径一致", "kind": "推导", "derived_from": ["LS-2", "LS-6", "LS-10"], "evidence": [{ "source_id": "SRC-006", "location": "「到期边界」", "quote": "`now == expires_at` 属于已过期" }, { "source_id": "SRC-003", "location": "L15", "quote": "return now < expires_at" }, { "source_id": "SRC-008", "location": "「修复」", "quote": "把比较运算符从 `<=` 改成 `<`" }], "caveat": "一致仅指三份文本互相印证，不等于已被实际测试通过" }
+      ],
+      "open_questions": [
+        "测试是否实际通过 —— 未知，本次未运行任何测试",
+        "SESSION_TTL_MINUTES 是否接入有效期计算 —— 见 token-lifecycle.md",
+        "X-Session-Expires-At 是否真由当前代码产出 —— 可见模块中未见",
+        "\"管理后台\"与\"登录服务\"的关系 —— 未知",
+        "30 分钟是否可被运维配置覆盖后的实际取值 —— 未知"
+      ]
+    },
+    {
+      "page_id": "PAGE-TOKEN-LIFECYCLE",
+      "draft_path": "staging/technical/token-lifecycle.md",
+      "publish_path": "wiki/technical/token-lifecycle.md",
+      "title": "令牌生命周期（签发、校验、检查、续期、清理、退出）",
+      "status": "published",
+      "version": 1,
+      "content_sha256": "0285c5162dea6afab69cc309eb64d7535fee0853b32a0d9dba9fdba3f424d000",
+      "sources_used": [
+        { "source_id": "SRC-001", "relative_path": "raw/v1/app/auth.py", "sha256": "6f62febaf33bf1292fee20dadf55c8c59ca92589f09bd5b20d90ca1867889442", "citations": ["L1-5 docstring", "L14 导入", "L16 _TOKEN_STORE", "L17 _SECRET", "L20-22 _sign", "L25-35 issue_token", "L38-43 verify_token", "L46-54 check", "L57-60 expire_at", "L63-72 touch", "L75-81 purge_expired", "L84-90 logout"] },
+        { "source_id": "SRC-003", "relative_path": "raw/v1/app/session.py", "sha256": "9eec7917294a60b522ed758edabdabca6e56f50299837772781453eedbfc2c94", "citations": ["L1-4 docstring", "L9-15 is_session_valid", "L18-20 refresh_expiry"] },
+        { "source_id": "SRC-002", "relative_path": "raw/v1/app/config.py", "sha256": "b8ca51f475a15369ba3574ddd6d05f5f24c91417b813dd9edfeed9065e47a4f4", "citations": ["L1-5 docstring", "L10 环境变量读取"] },
+        { "source_id": "SRC-010", "relative_path": "raw/v1/pdf/PRD-login-2.5.0.pdf", "sha256": "fd22246372d7fcdb7cab743b3cec63179a26a28d12cffecb8fe9fdeaba43d2a5", "citations": ["「3. 涉及模块」PDF L9-10"] }
+      ],
+      "depends_on_pages": [
+        { "page": "wiki/technical/login-session.md", "relation": "续期阶段的有效期与边界规则由该页定义", "reason": "本页 touch() 的 30 分钟与 now < expires_at 语义引用登录会话规则" },
+        { "page": "wiki/project/logout-plan.md", "relation": "退出登录阶段的需求与验收由该页承载", "reason": "本页 §6 只登记实现状态，需求细节指向该页" }
+      ],
+      "referenced_by_pages": [
+        { "page": "wiki/technical/login-session.md", "reason": "SESSION_TTL_MINUTES 接线问题交叉引用" },
+        { "page": "wiki/project/logout-plan.md", "reason": "logout 实现状态与 touch 复活路径引用本页" }
+      ],
+      "conclusion_evidence": [
+        { "conclusion_id": "TL-1", "claim": "令牌为四段格式 user_id.issued_at.随机hex.签名", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L28-29", "quote": "raw = f\"{user_id}.{now}.{secrets.token_hex(8)}\"" }] },
+        { "conclusion_id": "TL-2", "claim": "签发时写入 user_id/issued_at/expires_at 到进程内字典", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L16, L30-34", "quote": "_TOKEN_STORE: dict[str, dict] = {}" }] },
+        { "conclusion_id": "TL-3", "claim": "签名用 HMAC-SHA256 取前 16 位，密钥硬编码", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L17, L22", "quote": "_SECRET = b\"login-demo-secret\"" }] },
+        { "conclusion_id": "TL-4", "claim": "校验先判段数 !=3 为无效，再用 compare_digest 常数时间比较", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L40-43", "quote": "if token.count(\".\") != 3" }, { "source_id": "SRC-001", "location": "L43", "quote": "return hmac.compare_digest(_sign(raw), signature)" }] },
+        { "conclusion_id": "TL-5", "claim": "check() 顺序为 验签 -> 查存储 -> 时间判断", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L46-54", "quote": "return is_session_valid(now, record[\"expires_at\"])" }] },
+        { "conclusion_id": "TL-6", "claim": "touch() 对已过期令牌返回 None，不续期", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L69-70", "quote": "if not is_session_valid(now, record[\"expires_at\"]): return None" }] },
+        { "conclusion_id": "TL-7", "claim": "purge_expired() 主动筛出并删除过期记录，返回条数", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L75-81", "quote": "dead = [t for t, r in _TOKEN_STORE.items() if not is_session_valid(now, r[\"expires_at\"])]" }] },
+        { "conclusion_id": "TL-8", "claim": "logout() 当前抛 NotImplementedError，未实现", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L84-90", "quote": "raise NotImplementedError(\"logout is not implemented yet\")" }] },
+        { "conclusion_id": "TL-9", "claim": "职责划分：auth 管生命周期、session 管时间判定；代码现状与该声明相符", "kind": "推导", "derived_from": ["TL-1", "TL-5", "LS-8"], "evidence": [{ "source_id": "SRC-010", "location": "「3. 涉及模块」", "quote": "auth 负责令牌生命周期，session 负责时间判定" }, { "source_id": "SRC-001", "location": "L14", "quote": "from .session import SESSION_TTL_SECONDS, is_session_valid, refresh_expiry" }], "caveat": "PRD 为草稿；\"符合\"指代码现状与草稿描述一致，不等于草稿已生效" },
+        { "conclusion_id": "TL-10", "claim": "config.SESSION_TTL_MINUTES 未接入有效期计算（限可见三模块范围）", "kind": "推导", "derived_from": ["LS-5", "LS-7"], "evidence": [{ "source_id": "SRC-002", "location": "L10", "quote": "SESSION_TTL_MINUTES = os.environ.get(\"SESSION_TTL_MINUTES\", \"\")" }, { "source_id": "SRC-001", "location": "L14", "quote": "from .session import SESSION_TTL_SECONDS, is_session_valid, refresh_expiry" }, { "source_id": "SRC-003", "location": "L1-20（全文，无 import config）", "quote": "SESSION_TTL_SECONDS = 30 * 60 / def is_session_valid(now, expires_at): / def refresh_expiry(now):" }], "caveat": "仅限 raw/v1/app/ 可见三模块；读取点可能在未提供的文件中，不得断言配置一定不生效", "note": "第三条证据为对 session.py 全文通读的观察（全文仅定义该常量与两个函数），非逐字引文；属推导链证据，非来源原文。" }
+      ],
+      "open_questions": [
+        "SESSION_TTL_MINUTES 接线 —— 重点待核对",
+        "logout 实现状态 —— 需求草稿，未实现",
+        "签名密钥硬编码是否可接受 —— 需人工裁定",
+        "_TOKEN_STORE 进程内存储的部署影响 —— 未声明部署形态",
+        "X-Session-Expires-At 产出位置 —— 可见模块中未见",
+        "purge_expired 的调用者 —— 未知"
+      ]
+    },
+    {
+      "page_id": "PAGE-SESSION-TYPES",
+      "draft_path": "staging/comparisons/session-types.md",
+      "publish_path": "wiki/comparisons/session-types.md",
+      "title": "会话类型对比（登录 / 支付 / 匿名浏览 / 记住我）",
+      "status": "published",
+      "version": 1,
+      "content_sha256": "dd571e8325d16e2d530323b3e776b12afe624b69898add8b6295445ad09a1686",
+      "sources_used": [
+        { "source_id": "SRC-011", "relative_path": "raw/v1/tables/session-matrix.csv", "sha256": "e15dbc93c9dda25f1905c5407da6568a8d74ae44e4a6fd9c59ae5ff08ebcd616", "citations": ["表头 6 列", "L2 login 行", "L3 pay 行", "L4 匿名浏览行", "L5 记住我行"] },
+        { "source_id": "SRC-006", "relative_path": "raw/v1/docs/session-rules.md", "sha256": "bfa3dbaa5c7b1df408032cc94bb23745ddc5afaa0aa10b3eefb7afab6c4bccdb", "citations": ["「有效期长度」", "「到期边界」", "「续期」", "「不适用范围」"] },
+        { "source_id": "SRC-005", "relative_path": "raw/v1/docs/payment-session.md", "sha256": "9354416930cfcb249a9662ce965c59853735b2d9812fe10cb6654f59b3b3dfdd", "citations": ["正文首段", "「有效期长度」", "「到期边界」", "「与登录会话的区别」"] },
+        { "source_id": "SRC-003", "relative_path": "raw/v1/app/session.py", "sha256": "9eec7917294a60b522ed758edabdabca6e56f50299837772781453eedbfc2c94", "citations": ["L15 登录会话边界实现"] },
+        { "source_id": "SRC-010", "relative_path": "raw/v1/pdf/PRD-login-2.5.0.pdf", "sha256": "fd22246372d7fcdb7cab743b3cec63179a26a28d12cffecb8fe9fdeaba43d2a5", "citations": ["「5. 不做的事情」PDF L13-14"] }
+      ],
+      "depends_on_pages": [
+        { "page": "wiki/technical/login-session.md", "relation": "登录会话整节由该页展开，本页只做对比引用", "reason": "避免重复定义 30 分钟与边界规则" }
+      ],
+      "referenced_by_pages": [
+        { "page": "wiki/technical/login-session.md", "reason": "不适用范围指向本页" },
+        { "page": "wiki/technical/token-lifecycle.md", "reason": "支付会话排除说明指向本页" }
+      ],
+      "conclusion_evidence": [
+        { "conclusion_id": "ST-1", "claim": "四种会话的六列属性以 CSV 为准（服务/类型/有效期/可续期/边界/负责人）", "kind": "原文事实", "evidence": [{ "source_id": "SRC-011", "location": "L1 表头", "quote": "服务,会话类型,有效期,可续期,到期边界处理,负责人" }, { "source_id": "SRC-011", "location": "L2-5", "quote": "login_demo,登录会话,30 分钟,是,恰好到期视为无效,认证组 / pay_gateway,支付会话,5 分钟,否,到期即置为超时,支付组 / login_demo,匿名浏览会话,120 分钟,是,到期后重新签发,认证组 / login_demo,记住我令牌,30 天,是,到期需重新登录,认证组" }] },
+        { "conclusion_id": "ST-2", "claim": "登录会话：30 分钟、可续期（需请求触发）、恰好到期无效 —— CSV 与文档一致", "kind": "原文事实", "evidence": [{ "source_id": "SRC-011", "location": "L2", "quote": "login_demo,登录会话,30 分钟,是,恰好到期视为无效,认证组" }, { "source_id": "SRC-006", "location": "「有效期长度」", "quote": "管理后台的登录会话有效期为 30 分钟" }, { "source_id": "SRC-006", "location": "「到期边界」", "quote": "`now == expires_at` 属于已过期" }] },
+        { "conclusion_id": "ST-3", "claim": "支付会话：5 分钟、不可续期、到期置为超时 —— CSV 与文档一致", "kind": "原文事实", "evidence": [{ "source_id": "SRC-011", "location": "L3", "quote": "pay_gateway,支付会话,5 分钟,否,到期即置为超时,支付组" }, { "source_id": "SRC-005", "location": "「有效期长度」", "quote": "支付会话有效期为 5 分钟" }, { "source_id": "SRC-005", "location": "「到期边界」", "quote": "支付会话到期后不刷新，只能重建" }] },
+        { "conclusion_id": "ST-4", "claim": "支付会话属 pay_gateway，与登录服务无关；两者共用 expires_at 字段名", "kind": "原文事实", "evidence": [{ "source_id": "SRC-005", "location": "正文首段", "quote": "适用服务：pay_gateway 收单网关。本文与登录服务无关" }, { "source_id": "SRC-005", "location": "「与登录会话的区别」", "quote": "两者共用 `expires_at` 字段名，排查问题时先确认是哪个服务的会话" }] },
+        { "conclusion_id": "ST-5", "claim": "匿名浏览会话：120 分钟、可续期、到期后重新签发（仅 CSV 单行来源）", "kind": "原文事实", "evidence": [{ "source_id": "SRC-011", "location": "L4", "quote": "login_demo,匿名浏览会话,120 分钟,是,到期后重新签发,认证组" }, { "source_id": "SRC-006", "location": "「不适用范围」", "quote": "本节规则只约束登录会话，不适用于支付会话、匿名浏览会话" }] },
+        { "conclusion_id": "ST-6", "claim": "记住我令牌：30 天、可续期、到期需重新登录（仅 CSV 单行来源），且 PRD 本次不改其有效期", "kind": "原文事实", "evidence": [{ "source_id": "SRC-011", "location": "L5", "quote": "login_demo,记住我令牌,30 天,是,到期需重新登录,认证组" }, { "source_id": "SRC-010", "location": "「5. 不做的事情」", "quote": "本次不清理浏览器端缓存，也不修改记住我令牌的有效期" }] },
+        { "conclusion_id": "ST-7", "claim": "四种类型的有效期与续期规则不得混用", "kind": "推导", "derived_from": ["ST-1", "ST-2", "ST-3", "ST-4", "ST-5", "ST-6"], "evidence": [{ "source_id": "SRC-006", "location": "「不适用范围」", "quote": "本节规则只约束登录会话，不适用于支付会话、匿名浏览会话" }, { "source_id": "SRC-005", "location": "正文首段", "quote": "本文与登录服务无关" }], "caveat": "四种到期后动作各异，expires_at 字段名相同不代表语义相同" }
+      ],
+      "open_questions": [
+        "匿名浏览会话的具体实现机制 —— 未知，仅 CSV 单行",
+        "记住我令牌的具体实现机制 —— 未知，仅 CSV 单行",
+        "CSV 自身的来源与时间 —— 无 frontmatter，文件级日期/版本/状态未声明",
+        "支付 now >= expires_at 与登录 now == expires_at 的精确边界关系 —— 待核对",
+        "CSV 与文档若冲突如何取舍 —— 本次未发现冲突，规则待明确"
+      ]
+    },
+    {
+      "page_id": "PAGE-LOGOUT-PLAN",
+      "draft_path": "staging/project/logout-plan.md",
+      "publish_path": "wiki/project/logout-plan.md",
+      "title": "退出登录方案（需求 / 当前实现 / 验收 / 未决）",
+      "status": "published",
+      "version": 1,
+      "content_sha256": "254d1c145c4544b2eb604690015dc6a2f99b75d13b074f5813c9d361890ecc09",
+      "sources_used": [
+        { "source_id": "SRC-001", "relative_path": "raw/v1/app/auth.py", "sha256": "6f62febaf33bf1292fee20dadf55c8c59ca92589f09bd5b20d90ca1867889442", "citations": ["L1-5 docstring", "L65-67 touch 记录缺失返回 None", "L84-90 logout()"] },
+        { "source_id": "SRC-003", "relative_path": "raw/v1/app/session.py", "sha256": "9eec7917294a60b522ed758edabdabca6e56f50299837772781453eedbfc2c94", "citations": ["L1-20 全文（确认无 invalidate）"] },
+        { "source_id": "SRC-009", "relative_path": "raw/v1/history/2026-10-06-logout-request.md", "sha256": "384966abf95c71f7f9b7c23df237169754ef4aef7609da23d8b7f4e400fc9df5", "citations": ["「背景」", "「需要改的地方」", "「验收标准」", "「未决问题」"] },
+        { "source_id": "SRC-010", "relative_path": "raw/v1/pdf/PRD-login-2.5.0.pdf", "sha256": "fd22246372d7fcdb7cab743b3cec63179a26a28d12cffecb8fe9fdeaba43d2a5", "citations": ["标题行 PDF L1-2", "「1. 目标」L3-4", "「2. 令牌失效的判定」L5-7", "「3. 涉及模块」L8-10", "「4. 验收标准」L11-12", "「5. 不做的事情」L13-14"] },
+        { "source_id": "SRC-012", "relative_path": "raw/v1/web/release-notes-2.4.0.html", "sha256": "430eb87bfe96feaf16a20565cd842b85f2724ed3004925318dbc3d46308de34b", "citations": ["「已知问题」"] },
+        { "source_id": "SRC-007", "relative_path": "raw/v1/docs/testing-guide.md", "sha256": "524507aed1aae8a685618d78f546003a45f7b93adb37435728edb668f5b8cb2c", "citations": ["「关键用例」", "「提交前检查」"] }
+      ],
+      "depends_on_pages": [
+        { "page": "wiki/technical/token-lifecycle.md", "relation": "logout 在令牌生命周期中的位置与实现现状由该页登记", "reason": "本页只写需求与验收，实现细节引用该页" }
+      ],
+      "referenced_by_pages": [
+        { "page": "wiki/technical/token-lifecycle.md", "reason": "§6 退出登录指向本页的需求与未决" }
+      ],
+      "conclusion_evidence": [
+        { "conclusion_id": "LP-1", "claim": "logout() 当前未实现，抛 NotImplementedError", "kind": "源码观察", "evidence": [{ "source_id": "SRC-001", "location": "L84-90", "quote": "raise NotImplementedError(\"logout is not implemented yet\")" }, { "source_id": "SRC-001", "location": "L1-5", "quote": "退出登录功能尚未实现，见 logout() 的 TODO" }] },
+        { "conclusion_id": "LP-2", "claim": "session.py 中不存在 invalidate() 或任何失效函数", "kind": "源码观察", "evidence": [{ "source_id": "SRC-003", "location": "L1-20（全文）", "quote": "SESSION_TTL_SECONDS = 30 * 60 / def is_session_valid(now, expires_at): / def refresh_expiry(now):" }], "note": "来源为该文件全文：仅上述 3 个定义，无 invalidate；此结论为对全文的通读观察，非某一行的直接引文。" },
+        { "conclusion_id": "LP-3", "claim": "v2.4.0 发布说明已把退出登录列为已知问题，计划 v2.5.0 提供", "kind": "历史记录", "evidence": [{ "source_id": "SRC-012", "location": "「已知问题」", "quote": "退出登录接口尚未实现，调用会抛出 NotImplementedError。计划在 v2.5.0 提供" }] },
+        { "conclusion_id": "LP-4", "claim": "需求目标：服务端立即让令牌失效，无需等 30 分钟自然到期", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-010", "location": "「1. 目标」", "quote": "服务端立即让该会话令牌失效，不需要等待 30 分钟自然到期" }] },
+        { "conclusion_id": "LP-5", "claim": "失效判定：退出后同一令牌 check() 必须返回 False", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-010", "location": "「2. 令牌失效的判定」", "quote": "同一个令牌再次调用 check() 必须返回 False" }] },
+        { "conclusion_id": "LP-6", "claim": "涉及模块：auth.py 实现 logout、session.py 新增 invalidate（二选一，先按第一种）、测试新增 test_logout_invalidates", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-009", "location": "「需要改的地方」", "quote": "把 `logout()` 从 `NotImplementedError` 改成真实实现，删除 `_TOKEN_STORE` 里的记录" }, { "source_id": "SRC-009", "location": "「需要改的地方」", "quote": "新增 `invalidate(token)` 之类的辅助函数，或直接在 auth 层删除记录，二选一，先按第一种做" }] },
+        { "conclusion_id": "LP-7", "claim": "验收要求（非结果）：check() 返回 False、测试全绿、不改既有期望值", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-009", "location": "「验收标准」", "quote": "退出后再用同一个令牌调用 `check()`，返回 False" }, { "source_id": "SRC-010", "location": "「4. 验收标准」", "quote": "全部用例通过，其中新增用例名为 test_logout_invalidates" }, { "source_id": "SRC-009", "location": "「验收标准」", "quote": "不修改既有测试文件的期望值" }, { "source_id": "SRC-007", "location": "「提交前检查」", "quote": "单元测试必须全绿" }, { "source_id": "SRC-007", "location": "「提交前检查」", "quote": "不要为了通过测试去修改测试文件，测试文件由维护者负责" }], "caveat": "全部为验收条件，本次未运行任何测试，不构成通过证据" },
+        { "conclusion_id": "LP-8", "claim": "不做的事：不清理浏览器端缓存、不改记住我令牌有效期", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-010", "location": "「5. 不做的事情」", "quote": "本次不清理浏览器端缓存，也不修改记住我令牌的有效期" }] },
+        { "conclusion_id": "LP-9", "claim": "未决：退出登录是否需同时清理服务端缓存，待运维确认", "kind": "需求草稿", "evidence": [{ "source_id": "SRC-009", "location": "「未决问题」", "quote": "退出登录是否需要同时清理服务端缓存，待运维确认" }], "caveat": "PRD §5 只回答了浏览器端缓存，未回答服务端缓存，本项仍未决" },
+        { "conclusion_id": "LP-10", "claim": "退出后 touch() 不会复活令牌（因记录不存在返回 None）", "kind": "推导", "derived_from": ["LP-1", "TL-6"], "evidence": [{ "source_id": "SRC-001", "location": "L66-67", "quote": "if record is None: return None" }], "caveat": "验收标准未覆盖此路径，需人工确认是否纳入" }
+      ],
+      "open_questions": [
+        "测试是否通过 —— 未知，本次未运行",
+        "logout 实现状态 —— 未实现，PRD 为草稿",
+        "session.invalidate() —— 不存在（可见范围内）",
+        "测试文件 tests/test_session.py —— 缺失，无法核对既有期望值",
+        "服务端缓存清理的裁定方 —— 待运维确认",
+        "退出后令牌能否被 touch() 复活 —— 原文未说明，验收未覆盖"
+      ]
+    }
+  ],
+  "page_graph": [
+    { "from": "wiki/technical/token-lifecycle.md", "to": "wiki/technical/login-session.md", "type": "depends_on" },
+    { "from": "wiki/technical/token-lifecycle.md", "to": "wiki/project/logout-plan.md", "type": "depends_on" },
+    { "from": "wiki/comparisons/session-types.md", "to": "wiki/technical/login-session.md", "type": "depends_on" },
+    { "from": "wiki/project/logout-plan.md", "to": "wiki/technical/token-lifecycle.md", "type": "depends_on" }
+  ],
+  "unresolved_global": [
+    {
+      "item": "测试执行结果",
+      "affected_pages": ["PAGE-LOGIN-SESSION", "PAGE-LOGOUT-PLAN"],
+      "reason": "原文只有用例名与验收要求，无执行记录；tests/test_session.py 未在 raw/v1 提供。不得把验收要求读作已通过。"
+    },
+    {
+      "item": "config.SESSION_TTL_MINUTES 是否接入有效期计算",
+      "affected_pages": ["PAGE-TOKEN-LIFECYCLE", "PAGE-LOGIN-SESSION"],
+      "reason": "可见三模块中无调用关系；读取点可能在未提供文件中，不得断言配置一定不生效。"
+    },
+    {
+      "item": "logout 实现状态与 PRD 批准状态",
+      "affected_pages": ["PAGE-LOGOUT-PLAN", "PAGE-TOKEN-LIFECYCLE"],
+      "reason": "源码为 NotImplementedError；v2.5.0 PRD 标题自带\"草稿\"，是否获批未知。"
+    },
+    {
+      "item": "匿名浏览会话与记住我令牌的实现",
+      "affected_pages": ["PAGE-SESSION-TYPES"],
+      "reason": "各仅有 CSV 单行描述，无文档与源码支撑，不得外推登录会话规则。"
+    },
+    {
+      "item": "X-Session-Expires-At 响应头的产出位置",
+      "affected_pages": ["PAGE-LOGIN-SESSION"],
+      "reason": "v2.4.0 发布说明称已新增，但可见三模块中无产生该头的代码。"
+    }
+  ]
+}

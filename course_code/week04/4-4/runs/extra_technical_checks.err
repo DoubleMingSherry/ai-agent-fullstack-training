@@ -1,0 +1,10 @@
+Generating embeddings:   0%|          | 0/26 [00:00<?, ?it/s]2026-10-07 00:52:50.096 python[60868:25224224] 2026-10-07 00:52:50.096120 [W:onnxruntime:Default, telemetry.cc:800 operator()] Failed to persist telemetry device ID; using an in-memory identifier
+/Users/wilson/deepseek-work/rag_demo/.venv/lib/python3.13/site-packages/huggingface_hub/utils/tqdm.py:176: UserWarning: Cannot enable progress bars: environment variable `HF_HUB_DISABLE_PROGRESS_BARS=1` is set and has priority.
+  warnings.warn(
+Generating embeddings:  38%|███▊      | 10/26 [00:00<00:00, 21.70it/s]Generating embeddings:  77%|███████▋  | 20/26 [00:00<00:00, 33.36it/s]Generating embeddings: 100%|██████████| 26/26 [00:00<00:00, 36.93it/s]Generating embeddings: 100%|██████████| 26/26 [00:00<00:00, 33.50it/s]
+2026-10-07 00:52:59.122 python[60868:25224227] NetworkStorageDB:_openDBReadConnections: failed to open read connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:52:59.122 python[60868:25224227] The read-connection to the DB=/Users/wilson/Library/Caches/python/Cache.db is NOT valid.  Unable to determine schema version.
+2026-10-07 00:52:59.122 python[60868:25224227] NetworkStorageDB:_openDBWriteConnections: failed to open write connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:52:59.122 python[60868:25224227] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db.
+2026-10-07 00:52:59.122 python[60868:25224227] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-shm.
+2026-10-07 00:52:59.122 python[60868:25224227] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-wal.

@@ -1,0 +1,14 @@
+=== 坑一：overwrite=False 再插一遍同一批节点 ===
+[进程 1] 用 overwrite=True 建库，写入 3 个节点
+        collection 行数：3
+
+[进程 2] 换一个进程，用 overwrite=False 把同样的节点再插一遍
+        collection 行数：6
+        检索 top-3：
+          [1] app/session.py § (整文件)  node_id=c30e91d9
+          [2] app/session.py § (整文件)  node_id=d1a4cb48
+          [3] app/config.py § (整文件)  node_id=97543f5d
+
+=== 坑二：进程退出后不 load 直接检索 ===
+[进程 3] 换一个进程，打开同一个 .db，不 load 直接检索
+        MilvusException: <MilvusException: (code=101, message=Collection 'login_demo_pitfall' is in state 'released'; call load() before search/get/query)>

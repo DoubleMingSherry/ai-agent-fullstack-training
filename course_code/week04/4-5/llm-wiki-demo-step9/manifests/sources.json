@@ -1,0 +1,287 @@
+{
+  "manifest_version": 1,
+  "generated_for": "llm-wiki-demo login 项目 LLM Wiki 实验",
+  "note": "本清单只登记来源与快照。字段值取自原文；原文未提供的记为 \"未知\"。资料版本(doc_version)是来源自身声明的版本，与本次导入快照(import_snapshot)不是一回事。本步骤不生成知识页。 另含 raw/discussions/ 下 1 份非版本化讨论资料（SRC-014），不属 v1/v2 快照。",
+  "archive": {
+    "file": "corpus.zip",
+    "sha256": "b63afc9409ffdb1fc8b68c4124f3078ac0bf19e0aa1db4571fabd3f414e4f5fa"
+  },
+  "import_snapshot": {
+    "snapshot_id": "v2",
+    "path": "raw/v2/",
+    "file_count": 1,
+    "imported_at": "2026-10-09",
+    "imported_by": "manual-import",
+    "note": "在 v1 之上新增快照，v1 全部内容原样保留（raw/v1/ 12 份文件未改动）。v2 仅新增 1 份来源 SRC-013。快照号与资料版本无关。"
+  },
+  "snapshots": [
+    {
+      "snapshot_id": "v1",
+      "path": "raw/v1/",
+      "file_count": 12,
+      "imported_at": "2026-10-09",
+      "status": "保留（不可变，未改动）",
+      "archive": {
+        "file": "corpus.zip",
+        "sha256": "b63afc9409ffdb1fc8b68c4124f3078ac0bf19e0aa1db4571fabd3f414e4f5fa"
+      }
+    },
+    {
+      "snapshot_id": "v2",
+      "path": "raw/v2/",
+      "file_count": 1,
+      "imported_at": "2026-10-09",
+      "status": "当前快照",
+      "sources": [
+        "SRC-013"
+      ],
+      "note": "仅含 docs/session-rules.md；未新增其他文件。"
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "SRC-001",
+      "relative_path": "raw/v1/app/auth.py",
+      "sha256": "6f62febaf33bf1292fee20dadf55c8c59ca92589f09bd5b20d90ca1867889442",
+      "material_type": "source_code",
+      "doc_version": "未知",
+      "declared_date": "未知",
+      "declared_status": "未知",
+      "declared_owner": "未知",
+      "import_snapshot": "v1",
+      "observation": "词法层面可见 logout() 抛出 NotImplementedError，注释标注 TODO 未实现；原文未声明版本与状态。"
+    },
+    {
+      "source_id": "SRC-002",
+      "relative_path": "raw/v1/app/config.py",
+      "sha256": "b8ca51f475a15369ba3574ddd6d05f5f24c91417b813dd9edfeed9065e47a4f4",
+      "material_type": "source_code",
+      "doc_version": "未知",
+      "declared_date": "未知",
+      "declared_status": "未知",
+      "declared_owner": "未知",
+      "import_snapshot": "v1",
+      "observation": "定义 SESSION_TTL_MINUTES 读取环境变量，默认空字符串；原文未声明版本与状态。"
+    },
+    {
+      "source_id": "SRC-003",
+      "relative_path": "raw/v1/app/session.py",
+      "sha256": "9eec7917294a60b522ed758edabdabca6e56f50299837772781453eedbfc2c94",
+      "material_type": "source_code",
+      "doc_version": "未知",
+      "declared_date": "未知",
+      "declared_status": "未知",
+      "declared_owner": "未知",
+      "import_snapshot": "v1",
+      "observation": "定义 SESSION_TTL_SECONDS = 30*60 与 is_session_valid/refresh_expiry；原文未声明版本与状态。"
+    },
+    {
+      "source_id": "SRC-004",
+      "relative_path": "raw/v1/docs/faq.md",
+      "sha256": "c28750172fb917b2b78da56a9f8649858b9d8a62c1f324f49ea0554f456944c2",
+      "material_type": "documentation",
+      "doc_version": "未知",
+      "declared_date": "2026-09-25",
+      "declared_status": "未知",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "frontmatter 字段 updated 作为资料日期登记；原文未声明版本与批准状态。"
+    },
+    {
+      "source_id": "SRC-005",
+      "relative_path": "raw/v1/docs/payment-session.md",
+      "sha256": "9354416930cfcb249a9662ce965c59853735b2d9812fe10cb6654f59b3b3dfdd",
+      "material_type": "documentation",
+      "doc_version": "未知",
+      "declared_date": "2026-08-15",
+      "declared_status": "未知",
+      "declared_owner": "支付组",
+      "import_snapshot": "v1",
+      "observation": "适用服务为 pay_gateway，原文明确声明与登录服务无关。"
+    },
+    {
+      "source_id": "SRC-006",
+      "relative_path": "raw/v1/docs/session-rules.md",
+      "sha256": "bfa3dbaa5c7b1df408032cc94bb23745ddc5afaa0aa10b3eefb7afab6c4bccdb",
+      "material_type": "documentation",
+      "doc_version": "未知",
+      "declared_date": "2026-10-01",
+      "declared_status": "未知",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "声明为登录会话规则；原文未声明版本与批准状态。",
+      "superseded_by": "SRC-013",
+      "supersession_note": "v1 规则（30 分钟）自 2026-10-09 起被 SRC-013（v2 规则，60 分钟）替代。本文件保留在 raw/v1 中未修改，仅登记替代关系。"
+    },
+    {
+      "source_id": "SRC-007",
+      "relative_path": "raw/v1/docs/testing-guide.md",
+      "sha256": "524507aed1aae8a685618d78f546003a45f7b93adb37435728edb668f5b8cb2c",
+      "material_type": "documentation",
+      "doc_version": "未知",
+      "declared_date": "2026-09-20",
+      "declared_status": "未知",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "列出关键用例名；原文未提供测试实际执行结果。"
+    },
+    {
+      "source_id": "SRC-008",
+      "relative_path": "raw/v1/history/2026-09-12-expiry-bug.md",
+      "sha256": "776a7b5696632034a89ebeea0459e2924d84192a6221cd2eb65ac1e93d9b8f81",
+      "material_type": "incident_record",
+      "doc_version": "未知",
+      "declared_date": "2026-09-12",
+      "declared_status": "未知",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "记录历史故障与修复；描述的测试通过属来源自述，本次未复跑。"
+    },
+    {
+      "source_id": "SRC-009",
+      "relative_path": "raw/v1/history/2026-10-06-logout-request.md",
+      "sha256": "384966abf95c71f7f9b7c23df237169754ef4aef7609da23d8b7f4e400fc9df5",
+      "material_type": "requirement_draft",
+      "doc_version": "未知",
+      "declared_date": "2026-10-06",
+      "declared_status": "未知",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "topic 为 requirement 的讨论记录，属需求草稿；原文未声明批准状态，含未决问题。"
+    },
+    {
+      "source_id": "SRC-010",
+      "relative_path": "raw/v1/pdf/PRD-login-2.5.0.pdf",
+      "sha256": "fd22246372d7fcdb7cab743b3cec63179a26a28d12cffecb8fe9fdeaba43d2a5",
+      "material_type": "requirement_draft",
+      "doc_version": "v2.5.0",
+      "declared_date": "2026-10-06",
+      "declared_status": "草稿",
+      "declared_owner": "认证组",
+      "import_snapshot": "v1",
+      "observation": "正文标题自带'草稿'字样；文档编号 PRD-LOGIN-025。资料日期取 PDF 元数据 CreationDate=D:20261006160850Z。",
+      "extraction": {
+        "method": "pypdf",
+        "pages": 1,
+        "success": true
+      }
+    },
+    {
+      "source_id": "SRC-011",
+      "relative_path": "raw/v1/tables/session-matrix.csv",
+      "sha256": "e15dbc93c9dda25f1905c5407da6568a8d74ae44e4a6fd9c59ae5ff08ebcd616",
+      "material_type": "table_data",
+      "doc_version": "未知",
+      "declared_date": "未知",
+      "declared_status": "未知",
+      "declared_owner": "未知",
+      "import_snapshot": "v1",
+      "observation": "文件级无 owner/日期字段，仅每行含'负责人'列；原文未提供文件级状态。"
+    },
+    {
+      "source_id": "SRC-012",
+      "relative_path": "raw/v1/web/release-notes-2.4.0.html",
+      "sha256": "430eb87bfe96feaf16a20565cd842b85f2724ed3004925318dbc3d46308de34b",
+      "material_type": "release_note",
+      "doc_version": "v2.4.0",
+      "declared_date": "2026-09-20",
+      "declared_status": "已发布",
+      "declared_owner": "未知",
+      "import_snapshot": "v1",
+      "observation": "正文声明发布日期 2026-09-20 与版本 v2.4.0；未声明维护人。"
+    },
+    {
+      "source_id": "SRC-013",
+      "relative_path": "raw/v2/docs/session-rules.md",
+      "sha256": "b309f914bd46706ef3a0a80ff5247256f1f010654e84cc376c27612fa82caae1",
+      "material_type": "documentation",
+      "doc_version": "v2",
+      "declared_date": "未知",
+      "declared_status": "本实验已批准（原文语）",
+      "declared_owner": "未知",
+      "import_snapshot": "v2",
+      "observation": "原文标题为「登录会话规则 v2（更新）」，正文状态写「本实验已批准」，生效条件写「从本次教学激活开始适用，替代v1登录规则」。原文未提供批准人姓名、批准日期或签字记录 —— 一律记为未知，未编造。正文自述「本资料只改变规则，不证明源码已经修改或测试已经通过」。",
+      "supersedes": "SRC-006",
+      "superseded_by": null,
+      "activation": {
+        "activated_at": "2026-10-09",
+        "activation_basis": "「从本次教学激活开始适用」，由本实验操作者确认于本次导入时激活",
+        "approved_by": "未知",
+        "approval_note": "原文只写「本实验已批准」，未提供批准人身份、日期或签字。本项目无审批系统，不得据此声称存在正式审批流程或签字记录。"
+      }
+    },
+    {
+      "source_id": "SRC-014",
+      "relative_path": "raw/discussions/ttl-proposal.md",
+      "sha256": "67b7577f36f53c8bb47c36905009b93b9c5a529e596b47a6121a8f78c6c8e94b",
+      "material_type": "discussion_record",
+      "doc_version": "未知",
+      "declared_date": "未知",
+      "declared_status": "未批准、未生效（原文语）",
+      "declared_owner": "未知",
+      "import_snapshot": "n/a（raw/discussions/，不在 v1/v2 版本化快照内）",
+      "observation": "教学资料。原文自述「有人建议把登录会话有效期改为90分钟，但尚未批准，也未生效」。仅为讨论记录，**不能替代当前 60 分钟教学规则**（SRC-013）。无提议人、无日期、无批准人。",
+      "authoritative": false,
+      "authority_note": "非权威来源。不得作为任何页面的规则依据；只可用于记录“存在 90 分钟建议且未批准”。",
+      "proposes_ttl_minutes": 90
+    }
+  ],
+  "unresolved": [
+    {
+      "item": "资料版本(doc_version)",
+      "affected_sources": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-003",
+        "SRC-004",
+        "SRC-005",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009",
+        "SRC-011"
+      ],
+      "reason": "原文未声明版本，记为未知，不推断。"
+    },
+    {
+      "item": "批准状态(declared_status)",
+      "affected_sources": [
+        "SRC-004",
+        "SRC-005",
+        "SRC-006",
+        "SRC-007",
+        "SRC-008",
+        "SRC-009",
+        "SRC-011"
+      ],
+      "reason": "原文未声明批准或生效状态，记为未知，不推断。"
+    },
+    {
+      "item": "负责人(declared_owner)",
+      "affected_sources": [
+        "SRC-001",
+        "SRC-002",
+        "SRC-003",
+        "SRC-011",
+        "SRC-012"
+      ],
+      "reason": "原文未声明负责人，记为未知，不推断。注意 owner 字段仅为描述，不等于鉴权。"
+    },
+    {
+      "item": "PRD 草稿的批准状态与最终版本",
+      "affected_sources": [
+        "SRC-010"
+      ],
+      "reason": "PRD 正文标明为草稿，是否获批、是否随实现变更，原文未提供。"
+    },
+    {
+      "item": "会话有效期配置是否真正生效",
+      "affected_sources": [
+        "SRC-002",
+        "SRC-003",
+        "SRC-001"
+      ],
+      "reason": "config.py 声明 SESSION_TTL_MINUTES 可被环境变量覆盖，但本次仅做导入，未做运行时验证；是否被 auth/session 实际读取待核对。此条为待核对项，不作为结论。"
+    }
+  ]
+}

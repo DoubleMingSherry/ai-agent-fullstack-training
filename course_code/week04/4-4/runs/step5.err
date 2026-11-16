@@ -1,0 +1,17 @@
+Generating embeddings:   0%|          | 0/30 [00:00<?, ?it/s]Generating embeddings:  33%|███▎      | 10/30 [00:01<00:03,  5.32it/s]Generating embeddings:  67%|██████▋   | 20/30 [00:03<00:01,  5.50it/s]Generating embeddings: 100%|██████████| 30/30 [00:05<00:00,  6.17it/s]Generating embeddings: 100%|██████████| 30/30 [00:05<00:00,  5.95it/s]
+Generating embeddings:   0%|          | 0/30 [00:00<?, ?it/s]2026-10-07 00:26:43.110 python[57093:25198230] 2026-10-07 00:26:43.110837 [W:onnxruntime:Default, telemetry.cc:800 operator()] Failed to persist telemetry device ID; using an in-memory identifier
+/Users/wilson/deepseek-work/rag_demo/.venv/lib/python3.13/site-packages/huggingface_hub/utils/tqdm.py:176: UserWarning: Cannot enable progress bars: environment variable `HF_HUB_DISABLE_PROGRESS_BARS=1` is set and has priority.
+  warnings.warn(
+Generating embeddings:  33%|███▎      | 10/30 [00:00<00:01, 17.18it/s]Generating embeddings:  67%|██████▋   | 20/30 [00:00<00:00, 22.39it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 23.56it/s]Generating embeddings: 100%|██████████| 30/30 [00:01<00:00, 22.52it/s]
+2026-10-07 00:26:52.131 python[57093:25198255] NetworkStorageDB:_openDBReadConnections: failed to open read connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:26:52.131 python[57093:25198255] The read-connection to the DB=/Users/wilson/Library/Caches/python/Cache.db is NOT valid.  Unable to determine schema version.
+2026-10-07 00:26:52.131 python[57093:25198255] NetworkStorageDB:_openDBWriteConnections: failed to open write connection to DB @ /Users/wilson/Library/Caches/python/Cache.db.  Error=14. Cause=unable to open database file
+2026-10-07 00:26:52.131 python[57093:25198255] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db.
+2026-10-07 00:26:52.131 python[57093:25198255] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-shm.
+2026-10-07 00:26:52.131 python[57093:25198255] DEBUG: there is no SQL cache DB located at /Users/wilson/Library/Caches/python/Cache.db-wal.
+2026-10-07 00:26:53.216 python[57093:25198532] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:26:53.461 python[57093:25198531] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:27:02.721 python[57093:25198730] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:27:46.368 python[57093:25199258] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:28:37.005 python[57093:25199541] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
+2026-10-07 00:29:52.862 python[57093:25200931] writeDBwithCachedResponse-ERROR: (_dbWriteConnection=0x156f16c00) insert SQL stmnt. is nil for storage: /Users/wilson/Library/Caches/python
